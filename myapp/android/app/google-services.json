@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "602701493554",
+    "project_id": "niyan-e2e4e",
+    "storage_bucket": "niyan-e2e4e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:602701493554:android:10d6b15ac4c90a93e2d32b",
+        "android_client_info": {
+          "package_name": "com.example.myapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC25svqtUb6Y4eTnqV4Ht8mxxTDrLpDC5M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

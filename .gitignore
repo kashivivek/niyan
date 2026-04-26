@@ -1,0 +1,66 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code related
+.vscode/
+
+# Firebase Studio / IDX
+.idx/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/Generated.xcconfig
+**/macos/Flutter/ephemeral/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/.pub-cache/
+**/.pub/
+**/build/
+**/pubspec.lock
+
+# Android Studio will place build artifacts here
+**/android/app/debug
+**/android/app/profile
+**/android/app/release
+**/android/.gradle/
+**/android/build/
+**/android/local.properties
+
+# iOS/macOS
+**/ios/Pods/
+**/macos/Pods/
+**/DerivedData/
+
+# Firebase
+**/firebase_options.dart
+**/firebase-debug.log
+**/firebase-debug.*.log
+
+# Generated files
+*.g.dart
+*.freezed.dart
+
+# Large artifacts
+*.apk
+*.aab
+*.ipa
+*.so
+*.dill
+kernel_blob.bin
