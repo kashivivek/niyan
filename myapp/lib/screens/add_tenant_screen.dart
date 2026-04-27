@@ -22,8 +22,7 @@ class AddTenantScreenState extends State<AddTenantScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _rentAmountController = TextEditingController();
-  DateTime? _dueDate;
+  final _altPhoneController = TextEditingController(); // #6
   DateTime? _moveInDate;
   File? _image;
   final ImagePicker _picker = ImagePicker();
@@ -37,21 +36,16 @@ class AddTenantScreenState extends State<AddTenantScreen> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context,
-      {required bool isMoveInDate}) async {
+  Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: _moveInDate ?? DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
     );
     if (picked != null) {
       setState(() {
-        if (isMoveInDate) {
-          _moveInDate = picked;
-        } else {
-          _dueDate = picked;
-        }
+        _moveInDate = picked;
       });
     }
   }
@@ -73,24 +67,18 @@ class AddTenantScreenState extends State<AddTenantScreen> {
         return;
       }
 
-      if (_dueDate == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select the next rent due date.')),
-        );
-        return;
-      }
-
       final newTenant = TenantModel(
-        id: '', // Firestore will generate this
+        id: '',
         name: _nameController.text,
-        phoneNumber: _phoneController.text,
-        rentAmount: double.tryParse(_rentAmountController.text) ?? 0.0,
-        dueDate: _dueDate!,
+        phoneNumber: _phoneController.text.isNotEmpty ? _phoneController.text : null,
+        alternatePhone: _altPhoneController.text.isNotEmpty ? _altPhoneController.text : null,
+        rentAmount: 0.0,
+        dueDate: DateTime.now(), // placeholder; due date is now per unit
         moveInDate: _moveInDate!,
         ownerId: user.uid,
         isAssignedToUnit: false,
-        propertyId: '', // Placeholder for unassigned tenant
-        assignedUnitId: '', // Placeholder for unassigned tenant
+        propertyId: '',
+        assignedUnitId: '',
       );
 
       try {
@@ -175,42 +163,25 @@ class AddTenantScreenState extends State<AddTenantScreen> {
                   prefixIcon: Icon(Icons.phone),
                 ),
                 keyboardType: TextInputType.phone,
-                validator: (value) =>
-                    value!.isEmpty ? 'Please enter a phone number' : null,
               ),
               const SizedBox(height: 16),
+              // #6: Alternate phone number field
               TextFormField(
-                controller: _rentAmountController,
+                controller: _altPhoneController,
                 decoration: const InputDecoration(
-                  labelText: 'Rent Amount',
+                  labelText: 'Alternate Phone Number (Optional)',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.monetization_on),
+                  prefixIcon: Icon(Icons.phone_forwarded_outlined),
                 ),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (value!.isEmpty) {
-                    return 'Please enter a rent amount';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Please enter a valid number';
-                  }
-                  return null;
-                },
+                keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 16),
+              // #7: Rent Amount field removed — rent is managed at unit level
               _buildDatePicker(
                 context: context,
                 label: 'Move-in Date',
                 date: _moveInDate,
-                onPressed: () => _selectDate(context, isMoveInDate: true),
-              ),
-              const SizedBox(height: 16),
-              _buildDatePicker(
-                context: context,
-                label: 'Next Rent Due Date',
-                date: _dueDate,
-                onPressed: () => _selectDate(context, isMoveInDate: false),
+                onPressed: () => _selectDate(context),
               ),
               const SizedBox(height: 32),
               ElevatedButton(

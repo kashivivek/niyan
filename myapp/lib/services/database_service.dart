@@ -25,6 +25,7 @@ class DatabaseService {
   }
 
   Future<void> updateUser(UserModel user) {
+    developer.log('Updating user profile for ${user.uid}: ${user.toMap()}');
     return _db.collection('users').doc(user.uid).set(user.toMap(), SetOptions(merge: true));
   }
 
@@ -124,6 +125,28 @@ class DatabaseService {
         .update(unit.toFirestore());
   }
 
+  Future<void> deleteUnit(String id, String propertyId) async {
+    final unitRef = _db
+        .collection('properties')
+        .doc(propertyId)
+        .collection('units')
+        .doc(id);
+
+    final unitSnapshot = await unitRef.get();
+    final unitData = unitSnapshot.data();
+
+    final batch = _db.batch();
+
+    if (unitData != null && unitData['currentTenantId'] != null) {
+      final tenantId = unitData['currentTenantId'];
+      final tenantRef = _db.collection('tenants').doc(tenantId);
+      batch.update(tenantRef, {'isAssignedToUnit': false});
+    }
+
+    batch.delete(unitRef);
+    await batch.commit();
+  }
+
   // Tenants
   Stream<List<TenantModel>> getTenants(String ownerId) {
     return _db
@@ -206,10 +229,10 @@ class DatabaseService {
         });
   }
 
-  Stream<List<TransactionModel>> getAllTransactionsForUnit(String unitId) {
+  Stream<List<TransactionModel>> allTransactions(String ownerId) {
     return _db
         .collection('transactions')
-        .where('unitId', isEqualTo: unitId)
+        .where('ownerId', isEqualTo: ownerId)
         .snapshots()
         .map((snapshot) {
           final list = snapshot.docs
@@ -218,16 +241,6 @@ class DatabaseService {
           list.sort((a, b) => b.date.compareTo(a.date));
           return list;
         });
-  }
-
-  Stream<List<TransactionModel>> allTransactions(String ownerId) {
-    return allUnits(ownerId).switchMap((units) {
-      if (units.isEmpty) return Stream.value(<TransactionModel>[]);
-      final txStreams = units.map((u) => getTransactionsForUnit(u.id));
-      return CombineLatestStream.list(txStreams).map(
-        (listOfLists) => listOfLists.expand((txs) => txs).toList(),
-      );
-    });
   }
 
   // Tenancy History
@@ -253,76 +266,188 @@ class DatabaseService {
     });
   }
 
-  Stream<List<UpcomingDue>> getUpcomingDues(String ownerId) {
-  return _db
-      .collectionGroup('units')
-      .where('ownerId', isEqualTo: ownerId)
-      .where('currentTenantId', isNotEqualTo: null)
-      .snapshots()
-      .asyncMap((unitsSnapshot) async {
-        final unitDocs = unitsSnapshot.docs;
-        if (unitDocs.isEmpty) return [];
+  // Explicit Rent Record Sync
+  Future<void> ensureRentRecordsExist(String ownerId) async {
+    developer.log('ensureRentRecordsExist: checking for $ownerId');
+    final units = await allUnits(ownerId).first;
+    final tenants = await getAllTenants(ownerId).first;
+    final tenantMap = {for (var t in tenants) t.id: t};
 
-        final tenantIds = unitDocs.map((doc) => doc.data()['currentTenantId'] as String).toSet().toList();
-        final propertyIds = unitDocs.map((doc) => doc.data()['propertyId'] as String).toSet().toList();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // We check Current Month, Previous Month (for overdue), and Next Month (if close)
+    final monthsToCheck = [
+      DateTime(now.year, now.month - 1, 1),
+      DateTime(now.year, now.month, 1),
+      DateTime(now.year, now.month + 1, 1),
+    ];
 
-        final tenantsSnapshot = await _db.collection('tenants').where(FieldPath.documentId, whereIn: tenantIds).get();
-        final tenants = tenantsSnapshot.docs.map((doc) => TenantModel.fromFirestore(doc)).toList();
-        final tenantMap = {for (var tenant in tenants) tenant.id: tenant};
+    final batch = _db.batch();
+    bool hasChanges = false;
 
-        final propertiesSnapshot = await _db.collection('properties').where(FieldPath.documentId, whereIn: propertyIds).get();
-        final properties = propertiesSnapshot.docs.map((doc) => PropertyModel.fromFirestore(doc)).toList();
-        final propertyMap = {for (var prop in properties) prop.id: prop};
+    for (final unit in units) {
+      final tenantId = unit.currentTenantId;
+      if (tenantId == null || tenantId.isEmpty) continue;
+      final tenant = tenantMap[tenantId];
+      if (tenant == null || tenant.status != TenantStatus.active) continue;
 
-        final upcomingDues = <UpcomingDue>[];
-        final now = DateTime.now();
+      for (final monthDate in monthsToCheck) {
+        final monthStr = DateFormat('yyyy-MM').format(monthDate);
+        
+        // Skip if move-in date is after this month
+        if (tenant.moveInDate.isAfter(DateTime(monthDate.year, monthDate.month, DateUtils.getDaysInMonth(monthDate.year, monthDate.month)))) continue;
 
-        for (final unitDoc in unitDocs) {
-          final unit = UnitModel.fromFirestore(unitDoc);
-          final tenant = tenantMap[unit.currentTenantId];
-          final property = propertyMap[unit.propertyId];
+        final daysInMonth = DateUtils.getDaysInMonth(monthDate.year, monthDate.month);
+        final dueDay = unit.rentDueDate;
+        final clampedDay = (dueDay > daysInMonth) ? daysInMonth : (dueDay <= 0 ? 1 : dueDay);
+        final dueDate = DateTime(monthDate.year, monthDate.month, clampedDay);
 
-          if (tenant != null && property != null) {
-            final dueDay = tenant.dueDate.day;
-            final dueDate = DateTime(now.year, now.month, dueDay);
-            final nextDueDate = dueDate.isBefore(now)
-                ? DateTime(now.year, now.month + 1, dueDay)
-                : dueDate;
+        // Logic: 7 days before due date, we ensure the record exists
+        if (today.add(const Duration(days: 7)).isAfter(dueDate) || today.isAfter(dueDate)) {
+          final query = await _db
+              .collection('rent_records')
+              .where('unitId', isEqualTo: unit.id)
+              .where('tenantId', isEqualTo: tenant.id)
+              .where('month', isEqualTo: monthStr)
+              .where('title', isEqualTo: 'Monthly Rent') // Only sync auto-rent
+              .limit(1)
+              .get();
 
-            if (nextDueDate.difference(now).inDays <= 30) {
-              upcomingDues.add(UpcomingDue(
-                tenant: tenant,
-                unit: unit,
-                property: property,
-                dueDate: nextDueDate,
-                amount: unit.monthlyRent,
-              ));
-            }
+          if (query.docs.isEmpty) {
+            developer.log('Creating rent record for ${tenant.name} - $monthStr');
+            final ref = _db.collection('rent_records').doc();
+            final record = RentRecordModel(
+              id: ref.id,
+              tenantId: tenant.id,
+              propertyId: unit.propertyId,
+              unitId: unit.id,
+              ownerId: ownerId,
+              amount: unit.monthlyRent,
+              month: monthStr,
+              status: RentStatus.pending,
+              dueDate: dueDate,
+              title: 'Monthly Rent',
+            );
+            batch.set(ref, record.toFirestore());
+            hasChanges = true;
           }
         }
+      }
+    }
 
-        upcomingDues.sort((a, b) => a.dueDate.compareTo(b.dueDate));
-        return upcomingDues;
-      });
-}
+    if (hasChanges) {
+      await batch.commit();
+      developer.log('ensureRentRecordsExist: batch committed');
+    }
+  }
 
+  // Action Center Items (Source of Truth: rent_records)
+  Stream<List<ActionItem>> getActionItems(String ownerId) {
+    return CombineLatestStream.combine4(
+      _db.collection('rent_records').where('ownerId', isEqualTo: ownerId).snapshots(),
+      getAllTenants(ownerId),
+      getProperties(ownerId),
+      allUnits(ownerId),
+      (recordsSnap, tenants, properties, units) {
+        final records = recordsSnap.docs.map((doc) => RentRecordModel.fromFirestore(doc)).toList();
+        final tenantMap = {for (var t in tenants) t.id: t};
+        final propertyMap = {for (var p in properties) p.id: p};
+        final unitMap = {for (var u in units) u.id: u};
+        
+        final today = DateTime.now();
+        final limitDate = today.add(const Duration(days: 7));
 
-  // Complex Operations
+        return records
+            .where((r) => r.status != RentStatus.paid)
+            .where((r) => r.dueDate.isBefore(limitDate))
+            .map((r) {
+              final tenant = tenantMap[r.tenantId];
+              final prop = propertyMap[r.propertyId];
+              final unit = unitMap[r.unitId];
+              final isOverdue = today.isAfter(r.dueDate);
+
+              return ActionItem(
+                tenant: tenant ?? TenantModel(
+                  id: r.tenantId, 
+                  name: 'Unknown', 
+                  ownerId: ownerId, 
+                  propertyId: r.propertyId, 
+                  moveInDate: DateTime.now(),
+                  dueDate: r.dueDate,
+                  assignedUnitId: r.unitId,
+                ),
+                title: tenant != null ? '${tenant.name} (${r.title})' : r.title,
+                subtitle: [
+                  '${isOverdue ? 'Overdue' : 'Due'}: ${DateFormat('d MMM yyyy').format(r.dueDate)}',
+                  if (prop != null) prop.name,
+                  'Unit ${unit?.unitNumber ?? 'N/A'}', 
+                ].join(' · '),
+                amount: r.amount,
+                isOverdue: isOverdue,
+                dueDate: r.dueDate,
+                month: r.month,
+                propertyName: prop?.name ?? '',
+                unitNumber: unit?.unitNumber ?? '', 
+                rentRecordId: r.id,
+                propertyId: r.propertyId,
+                unitId: r.unitId,
+              );
+            })
+            .toList()
+            ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+      },
+    );
+  }
+
+  Future<void> recordRentPayment({
+    required ActionItem item,
+    required String ownerId,
+  }) async {
+    if (item.rentRecordId == null) return;
+
+    final batch = _db.batch();
+
+    // 1. Update Rent Record to Paid
+    final recordRef = _db.collection('rent_records').doc(item.rentRecordId);
+    batch.update(recordRef, {
+      'status': 'paid',
+      'paymentDate': Timestamp.now(),
+    });
+
+    // 2. Create Transaction for financial tracking
+    final txRef = _db.collection('transactions').doc();
+    final transaction = TransactionModel(
+      id: txRef.id,
+      unitId: item.unitId,
+      propertyId: item.propertyId,
+      ownerId: ownerId,
+      tenantId: item.tenant.id,
+      description: 'Payment for ${item.title} (${item.month})',
+      amount: item.amount,
+      date: DateTime.now(),
+      type: TransactionType.income,
+      month: item.month,
+    );
+    batch.set(txRef, transaction.toFirestore());
+
+    await batch.commit();
+  }
+
   Future<void> assignTenantToUnit({
     required String unitId,
     required String tenantId,
-    required String propertyId, // We need propertyId to locate the unit document
+    required String propertyId,
   }) async {
     final batch = _db.batch();
 
-    // 1. Create a new tenancy history record
     final tenancyHistoryRef = _db
         .collection('properties')
         .doc(propertyId)
         .collection('units')
         .doc(unitId)
         .collection('tenancyHistory')
-        .doc(); // New history entry
+        .doc();
 
     final newTenancyRecord = TenancyHistoryModel(
       id: tenancyHistoryRef.id,
@@ -332,7 +457,6 @@ class DatabaseService {
     );
     batch.set(tenancyHistoryRef, newTenancyRecord.toMap());
 
-    // 2. Update the unit to link the current tenant and tenancy history
     final unitRef =
         _db.collection('properties').doc(propertyId).collection('units').doc(unitId);
     batch.update(unitRef, {
@@ -341,39 +465,15 @@ class DatabaseService {
       'status': 'occupied',
     });
 
-    // 3. Update the tenant to mark them as assigned
     final tenantRef = _db.collection('tenants').doc(tenantId);
     batch.update(tenantRef, {'isAssignedToUnit': true});
 
     await batch.commit();
   }
 
-  Future<void> deleteUnit(String id, String propertyId) async {
-    final unitRef = _db
-        .collection('properties')
-        .doc(propertyId)
-        .collection('units')
-        .doc(id);
-
-    final unitSnapshot = await unitRef.get();
-    final unitData = unitSnapshot.data();
-
-    final batch = _db.batch();
-
-    if (unitData != null && unitData['currentTenantId'] != null) {
-      final tenantId = unitData['currentTenantId'];
-      final tenantRef = _db.collection('tenants').doc(tenantId);
-      batch.update(tenantRef, {'isAssignedToUnit': false});
-    }
-
-    batch.delete(unitRef);
-    await batch.commit();
-  }
-
   Future<void> unassignTenantFromUnit({
     required String unitId,
     required String tenantId,
-    // propertyId is needed if units are subcollections, which they are.
     required String propertyId,
   }) async {
     final batch = _db.batch();
@@ -402,181 +502,69 @@ class DatabaseService {
       batch.update(tenantRef, {'isAssignedToUnit': false});
 
       await batch.commit();
-    } else {
-      throw Exception('Tenant is not assigned to this unit or unit does not exist.');
     }
   }
 
-  // Rent Records
-  Stream<List<RentRecordModel>> getRentRecords(String ownerId, String month) {
-    return _db
-        .collectionGroup('rent_records')
-        .where('ownerId', isEqualTo: ownerId)
-        .where('month', isEqualTo: month)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => RentRecordModel.fromFirestore(doc))
-            .toList());
-  }
+  Future<void> addPropertyExpense({
+    required String propertyId,
+    required String ownerId,
+    required double totalAmount,
+    required String description,
+    required List<String> unitIds,
+    required String month,
+    bool billToTenants = false,
+  }) async {
+    if (unitIds.isEmpty) return;
+    final perUnitAmount = totalAmount / unitIds.length;
+    final expenseDate = DateFormat('yyyy-MM').parse(month);
+    final transactionDate = DateTime(expenseDate.year, expenseDate.month, 1);
 
-  Stream<List<RentRecordModel>> getAllRentRecords(String ownerId) {
-    return _db
-        .collectionGroup('rent_records')
-        .where('ownerId', isEqualTo: ownerId)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => RentRecordModel.fromFirestore(doc))
-            .toList());
-  }
+    final batch = _db.batch();
+    
+    // 1. Create Expense Transactions (Real money out)
+    for (final uid in unitIds) {
+      final ref = _db.collection('transactions').doc();
+      final transaction = TransactionModel(
+        id: ref.id,
+        unitId: uid,
+        propertyId: propertyId,
+        ownerId: ownerId,
+        description: '$description (Expense)',
+        amount: perUnitAmount,
+        date: transactionDate,
+        type: TransactionType.expense,
+        month: month,
+      );
+      batch.set(ref, transaction.toFirestore());
+    }
 
-  Stream<List<RentRecordModel>> getRentRecordsForTenant(String tenantId) {
-    return _db
-        .collection('rent_records')
-        .where('tenantId', isEqualTo: tenantId)
-        .orderBy('month', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => RentRecordModel.fromFirestore(doc))
-            .toList());
-  }
-
-  Future<void> updateRentRecord(RentRecordModel record) {
-    return _db.collection('rent_records').doc(record.id).update(record.toFirestore());
-  }
-
-  Stream<List<TenantModel>> getUnpaidTenantsThisMonth(String ownerId) {
-    final currentMonth = DateFormat('yyyy-MM').format(DateTime.now());
-    return _db
-        .collection('rent_records')
-        .where('ownerId', isEqualTo: ownerId)
-        .where('month', isEqualTo: currentMonth)
-        .where('status', whereIn: ['pending', 'partial'])
-        .snapshots()
-        .asyncMap((snapshot) async {
-      final tenantIds = snapshot.docs.map((doc) => doc['tenantId'] as String).toSet().toList();
-      if (tenantIds.isEmpty) {
-        return [];
-      }
-      final tenantsSnapshot = await _db
-          .collection('tenants')
-          .where(FieldPath.documentId, whereIn: tenantIds)
-          .get();
-      return tenantsSnapshot.docs
-          .map((doc) => TenantModel.fromFirestore(doc))
-          .toList();
-    });
-  }
-
-  Stream<List<ActionItem>> getActionItems(String ownerId) {
-    // Use getAllTenants stream as the trigger, then asyncMap to fetch all rent records
-    return getAllTenants(ownerId).asyncMap((allTenants) async {
-      final assignedTenants = allTenants
-          .where((t) => t.isAssignedToUnit && t.status == TenantStatus.active)
-          .toList();
-
-      final actionItems = <ActionItem>[];
-      if (assignedTenants.isEmpty) return actionItems;
-
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final nextMonthStart = DateTime(now.year, now.month + 1);
-
-      for (final tenant in assignedTenants) {
-        // Fetch this tenant's rent records as a one-time future
-        final recordsSnap = await _db
-            .collection('rent_records')
-            .where('tenantId', isEqualTo: tenant.id)
-            .get();
-
-        final records = recordsSnap.docs
-            .map((d) => RentRecordModel.fromFirestore(d))
-            .toList();
-
-        final paidMonths = <String>{
-          for (var r in records.where((r) => r.status == RentStatus.paid)) r.month
-        };
-        final recordedMonths = <String, RentRecordModel>{
-          for (var r in records) r.month: r
-        };
-
-        // Walk every month from moveIn up to next month
-        var cursor = DateTime(tenant.moveInDate.year, tenant.moveInDate.month);
-
-        while (!cursor.isAfter(nextMonthStart)) {
-          final monthStr = DateFormat('yyyy-MM').format(cursor);
-
-          if (!paidMonths.contains(monthStr)) {
-            final dueDay = tenant.dueDate.day;
-            final daysInMonth = DateUtils.getDaysInMonth(cursor.year, cursor.month);
-            final clampedDay = dueDay > daysInMonth ? daysInMonth : dueDay;
-            final dueDate = DateTime(cursor.year, cursor.month, clampedDay);
-
-            // For future months: only show if due within 7 days
-            if (dueDate.isAfter(today) && dueDate.difference(today).inDays > 7) {
-              cursor = DateTime(cursor.year, cursor.month + 1);
-              continue;
-            }
-
-            final isOverdue = today.isAfter(dueDate);
-            final existingRecord = recordedMonths[monthStr];
-            final amount = existingRecord?.amount ?? tenant.rentAmount;
-
-            actionItems.add(ActionItem(
-              tenant: tenant,
-              title: tenant.name,
-              subtitle: '${isOverdue ? 'Overdue' : 'Due'}: ${DateFormat.yMMMd().format(dueDate)} ($monthStr)',
-              amount: amount,
-              isOverdue: isOverdue,
-              dueDate: dueDate,
-              month: monthStr,
-            ));
-          }
-
-          cursor = DateTime(cursor.year, cursor.month + 1);
+    // 2. If billable, create RentRecordModel entries (Money expected in)
+    if (billToTenants) {
+      // We need to find the tenants for these units
+      final unitsSnap = await _db.collection('properties').doc(propertyId).collection('units').get();
+      final unitMap = {for (var doc in unitsSnap.docs) doc.id: UnitModel.fromFirestore(doc)};
+      
+      for (final uid in unitIds) {
+        final unit = unitMap[uid];
+        if (unit != null && unit.currentTenantId != null) {
+          final recordRef = _db.collection('rent_records').doc();
+          final record = RentRecordModel(
+            id: recordRef.id,
+            tenantId: unit.currentTenantId!,
+            propertyId: propertyId,
+            unitId: uid,
+            ownerId: ownerId,
+            amount: perUnitAmount,
+            month: month,
+            status: RentStatus.pending,
+            dueDate: transactionDate.add(const Duration(days: 14)), // Default 2 weeks to pay
+            title: description,
+          );
+          batch.set(recordRef, record.toFirestore());
         }
       }
+    }
 
-      actionItems.sort((a, b) {
-        if (a.isOverdue && !b.isOverdue) return -1;
-        if (!a.isOverdue && b.isOverdue) return 1;
-        return a.dueDate.compareTo(b.dueDate);
-      });
-
-      return actionItems;
-    });
-  }
-
-  Future<void> recordRentPayment({
-    required String tenantId,
-    required String propertyId,
-    required String unitId,
-    required double amount,
-    required String month,
-  }) async {
-    // 1. Create a RentRecordModel
-    final rentRecord = RentRecordModel(
-      id: '',
-      tenantId: tenantId,
-      propertyId: propertyId,
-      unitId: unitId,
-      amount: amount,
-      month: month,
-      status: RentStatus.paid,
-      paymentDate: DateTime.now(),
-      notes: 'Auto-recorded payment',
-    );
-    await _db.collection('rent_records').add(rentRecord.toFirestore());
-
-    // 2. Create a TransactionModel
-    final transaction = TransactionModel(
-      id: '',
-      unitId: unitId,
-      propertyId: propertyId,
-      description: 'Rent Payment for $month',
-      amount: amount,
-      date: DateTime.now(),
-      type: TransactionType.income,
-    );
-    await addTransaction(transaction);
+    await batch.commit();
   }
 }
