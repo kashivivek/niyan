@@ -10,6 +10,11 @@ class ActionItem {
   final bool isOverdue;
   final DateTime dueDate;
   final String month;
+  final String propertyName; 
+  final String unitNumber;   
+  final String? rentRecordId;
+  final String propertyId;
+  final String unitId;
 
   const ActionItem({
     required this.tenant,
@@ -19,5 +24,10 @@ class ActionItem {
     required this.isOverdue,
     required this.dueDate,
     required this.month,
+    this.propertyName = '',
+    this.unitNumber = '',
+    this.rentRecordId,
+    this.propertyId = '',
+    this.unitId = '',
   });
 }

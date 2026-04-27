@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:myapp/models/property_model.dart';
 import 'package:myapp/models/unit_model.dart';
+import 'package:myapp/models/user_model.dart';
 import 'package:myapp/services/database_service.dart';
 import 'package:myapp/providers/theme_provider.dart';
+import 'package:myapp/utils/currency_helper.dart';
 import './add_unit_screen.dart';
 import './edit_property_screen.dart';
 import './unit_detail_screen.dart';
@@ -18,6 +21,7 @@ class PropertyDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final user = Provider.of<UserModel?>(context);
 
     return Scaffold(
       body: CustomScrollView(
@@ -129,7 +133,7 @@ class PropertyDetailScreen extends StatelessWidget {
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
-                      return UnitCard(unit: units[index]);
+                      return UnitCard(unit: units[index], currency: user?.currency);
                     },
                     childCount: units.length,
                   ),
@@ -139,17 +143,200 @@ class PropertyDetailScreen extends StatelessWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        icon: const Icon(Icons.add_home_outlined, color: Colors.white),
-        backgroundColor: ThemeProvider.accentBlue,
-        label: const Text('Add Unit', style: TextStyle(color: Colors.white)),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => AddUnitScreen(propertyId: property.id, property: property)),
-          );
-        },
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'add_expense_fab',
+            icon: const Icon(Icons.receipt_long_outlined, color: Colors.white),
+            backgroundColor: Colors.orange.shade700,
+            label: const Text('Add Property Expense', style: TextStyle(color: Colors.white)),
+            onPressed: () => _showAddExpenseDialog(context, databaseService),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton.extended(
+            heroTag: 'add_unit_fab',
+            icon: const Icon(Icons.add_home_outlined, color: Colors.white),
+            backgroundColor: ThemeProvider.accentBlue,
+            label: const Text('Add Unit', style: TextStyle(color: Colors.white)),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => AddUnitScreen(propertyId: property.id, property: property)),
+              );
+            },
+          ),
+        ],
       ),
+    );
+  }
+
+  void _showAddExpenseDialog(BuildContext context, DatabaseService databaseService) async {
+    final unitsSnap = await databaseService.getUnits(property.id).first;
+    if (!context.mounted) return;
+
+    final ownerId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final descController = TextEditingController();
+    final amountController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final now = DateTime.now();
+    int selectedMonth = now.month;
+    int selectedYear = now.year;
+    
+    final years = List.generate(5, (i) => now.year - 2 + i);
+    final months = List.generate(12, (i) => i + 1);
+
+    final Set<String> selectedUnitIds = unitsSnap.map((u) => u.id).toSet();
+    bool billToTenants = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24, right: 24, top: 24,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 32,
+              ),
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Add Property Expense', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold)),
+                      Text('Split equally across selected units.', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                      const SizedBox(height: 24),
+                      TextFormField(
+                        controller: descController,
+                        decoration: const InputDecoration(
+                          labelText: 'Description',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.description_outlined),
+                        ),
+                        validator: (v) => v == null || v.isEmpty ? 'Enter a description' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: amountController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Total Amount',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.attach_money_rounded),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return 'Enter an amount';
+                          if (double.tryParse(v) == null) return 'Enter a valid number';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              value: selectedMonth,
+                              decoration: const InputDecoration(labelText: 'Month', border: OutlineInputBorder()),
+                              items: months.map((m) => DropdownMenuItem(value: m, child: Text(DateFormat('MMMM').format(DateTime(2022, m))))).toList(),
+                              onChanged: (v) { if (v != null) setModalState(() => selectedMonth = v); },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              value: selectedYear,
+                              decoration: const InputDecoration(labelText: 'Year', border: OutlineInputBorder()),
+                              items: years.map((y) => DropdownMenuItem(value: y, child: Text(y.toString()))).toList(),
+                              onChanged: (v) { if (v != null) setModalState(() => selectedYear = v); },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Text('Apply to Units', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      ...unitsSnap.map((unit) {
+                        final checked = selectedUnitIds.contains(unit.id);
+                        return CheckboxListTile(
+                          value: checked,
+                          title: Text('Unit ${unit.unitNumber}'),
+                          subtitle: Text(unit.isOccupied ? 'Occupied' : 'Vacant'),
+                          activeColor: ThemeProvider.accentBlue,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          onChanged: (val) {
+                            setModalState(() {
+                              if (val == true) selectedUnitIds.add(unit.id);
+                              else selectedUnitIds.remove(unit.id);
+                            });
+                          },
+                        );
+                      }),
+                      const SizedBox(height: 16),
+                      SwitchListTile(
+                        title: const Text('Bill to Tenants'),
+                        subtitle: const Text('Add this charge to each selected unit\'s ledger as "Due"'),
+                        value: billToTenants,
+                        onChanged: (v) => setModalState(() => billToTenants = v),
+                        activeColor: ThemeProvider.accentBlue,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ThemeProvider.accentBlue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: () async {
+                            if (!formKey.currentState!.validate()) return;
+                            if (selectedUnitIds.isEmpty) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Select at least one unit.')));
+                              return;
+                            }
+                            final monthStr = '${selectedYear}-${selectedMonth.toString().padLeft(2, '0')}';
+                            try {
+                              await databaseService.addPropertyExpense(
+                                propertyId: property.id,
+                                ownerId: ownerId,
+                                totalAmount: double.parse(amountController.text),
+                                description: descController.text,
+                                unitIds: selectedUnitIds.toList(),
+                                month: monthStr,
+                                billToTenants: billToTenants,
+                              );
+                              if (ctx.mounted) Navigator.pop(ctx);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Expense split across ${selectedUnitIds.length} unit(s) for $monthStr')),
+                                );
+                              }
+                            } catch (e) {
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e')));
+                              }
+                            }
+                          },
+                          child: Text('Add Expense', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -213,13 +400,12 @@ class PropertyDetailScreen extends StatelessWidget {
 
 class UnitCard extends StatelessWidget {
   final UnitModel unit;
+  final String? currency;
 
-  const UnitCard({super.key, required this.unit});
+  const UnitCard({super.key, required this.unit, this.currency});
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(locale: 'en_US', symbol: '\$');
-
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -255,7 +441,7 @@ class UnitCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        currencyFormat.format(unit.monthlyRent),
+                        CurrencyHelper.format(unit.monthlyRent, currency),
                         style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600),
                       ),
                     ],

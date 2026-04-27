@@ -23,9 +23,7 @@ void main() async {
       androidProvider: AndroidProvider.debug,
     );
   }
-  if (!kIsWeb) {
-    await NotificationService().init();
-  }
+  await NotificationService().init();
   runApp(const MyApp());
 }
 

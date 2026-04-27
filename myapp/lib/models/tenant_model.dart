@@ -6,8 +6,9 @@ class TenantModel {
   final String id;
   final String name;
   final String? phoneNumber;
+  final String? alternatePhone; // #6 - second mobile
   final String? email;
-  final double rentAmount;
+  final double rentAmount; // kept for legacy, not required in forms
   final DateTime dueDate;
   final DateTime moveInDate;
   final TenantStatus status;
@@ -21,8 +22,9 @@ class TenantModel {
     required this.id,
     required this.name,
     this.phoneNumber,
+    this.alternatePhone,
     this.email,
-    required this.rentAmount,
+    this.rentAmount = 0.0, // #7 - no longer required
     required this.dueDate,
     required this.moveInDate,
     this.status = TenantStatus.active,
@@ -39,6 +41,7 @@ class TenantModel {
       id: doc.id,
       name: data['name'] ?? '',
       phoneNumber: data['phoneNumber'] as String?,
+      alternatePhone: data['alternatePhone'] as String?,
       email: data['email'] as String?,
       rentAmount: (data['rentAmount'] ?? 0).toDouble(),
       dueDate: (data['dueDate'] as Timestamp).toDate(),
@@ -59,6 +62,7 @@ class TenantModel {
     return {
       'name': name,
       'phoneNumber': phoneNumber,
+      'alternatePhone': alternatePhone,
       'email': email,
       'rentAmount': rentAmount,
       'dueDate': dueDate,
@@ -76,6 +80,7 @@ class TenantModel {
     String? id,
     String? name,
     String? phoneNumber,
+    String? alternatePhone,
     String? email,
     double? rentAmount,
     DateTime? dueDate,
@@ -91,6 +96,7 @@ class TenantModel {
       id: id ?? this.id,
       name: name ?? this.name,
       phoneNumber: phoneNumber ?? this.phoneNumber,
+      alternatePhone: alternatePhone ?? this.alternatePhone,
       email: email ?? this.email,
       rentAmount: rentAmount ?? this.rentAmount,
       dueDate: dueDate ?? this.dueDate,

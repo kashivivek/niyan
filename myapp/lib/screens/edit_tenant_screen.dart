@@ -22,8 +22,7 @@ class EditTenantScreenState extends State<EditTenantScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
-  late TextEditingController _rentAmountController;
-  DateTime? _dueDate;
+  late TextEditingController _altPhoneController; // #6
   DateTime? _moveInDate;
   File? _image;
   final ImagePicker _picker = ImagePicker();
@@ -34,8 +33,7 @@ class EditTenantScreenState extends State<EditTenantScreen> {
     super.initState();
     _nameController = TextEditingController(text: widget.tenant.name);
     _phoneController = TextEditingController(text: widget.tenant.phoneNumber ?? '');
-    _rentAmountController = TextEditingController(text: widget.tenant.rentAmount.toString());
-    _dueDate = widget.tenant.dueDate;
+    _altPhoneController = TextEditingController(text: widget.tenant.alternatePhone ?? '');
     _moveInDate = widget.tenant.moveInDate;
   }
 
@@ -43,7 +41,7 @@ class EditTenantScreenState extends State<EditTenantScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
-    _rentAmountController.dispose();
+    _altPhoneController.dispose();
     super.dispose();
   }
 
@@ -56,20 +54,16 @@ class EditTenantScreenState extends State<EditTenantScreen> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context, {required bool isMoveInDate}) async {
+  Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: isMoveInDate ? _moveInDate ?? DateTime.now() : _dueDate ?? DateTime.now(),
+      initialDate: _moveInDate ?? DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
     );
     if (picked != null) {
       setState(() {
-        if (isMoveInDate) {
-          _moveInDate = picked;
-        } else {
-          _dueDate = picked;
-        }
+        _moveInDate = picked;
       });
     }
   }
@@ -83,20 +77,13 @@ class EditTenantScreenState extends State<EditTenantScreen> {
         return;
       }
 
-      if (_dueDate == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select the next rent due date.')),
-        );
-        return;
-      }
-
       setState(() => _isLoading = true);
 
       final updatedTenant = widget.tenant.copyWith(
         name: _nameController.text,
-        phoneNumber: _phoneController.text,
-        rentAmount: double.tryParse(_rentAmountController.text) ?? 0.0,
-        dueDate: _dueDate!,
+        phoneNumber: _phoneController.text.isNotEmpty ? _phoneController.text : null,
+        alternatePhone: _altPhoneController.text.isNotEmpty ? _altPhoneController.text : null,
+        // due date is now per unit — keep existing value
         moveInDate: _moveInDate!,
       );
 
@@ -180,40 +167,25 @@ class EditTenantScreenState extends State<EditTenantScreen> {
                   prefixIcon: Icon(Icons.phone),
                 ),
                 keyboardType: TextInputType.phone,
-                validator: (value) => value!.isEmpty ? 'Please enter a phone number' : null,
               ),
               const SizedBox(height: 16),
+              // #6: Alternate phone number field
               TextFormField(
-                controller: _rentAmountController,
+                controller: _altPhoneController,
                 decoration: const InputDecoration(
-                  labelText: 'Rent Amount',
+                  labelText: 'Alternate Phone Number (Optional)',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.monetization_on),
+                  prefixIcon: Icon(Icons.phone_forwarded_outlined),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) {
-                  if (value!.isEmpty) {
-                    return 'Please enter a rent amount';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Please enter a valid number';
-                  }
-                  return null;
-                },
+                keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 16),
+              // #7: Rent Amount field removed — managed at unit level
               _buildDatePicker(
                 context: context,
                 label: 'Move-in Date',
                 date: _moveInDate,
-                onPressed: () => _selectDate(context, isMoveInDate: true),
-              ),
-              const SizedBox(height: 16),
-              _buildDatePicker(
-                context: context,
-                label: 'Next Rent Due Date',
-                date: _dueDate,
-                onPressed: () => _selectDate(context, isMoveInDate: false),
+                onPressed: () => _selectDate(context),
               ),
               const SizedBox(height: 32),
               ElevatedButton(
@@ -222,7 +194,7 @@ class EditTenantScreenState extends State<EditTenantScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: _isLoading 
+                child: _isLoading
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Text('Save Changes', style: TextStyle(fontSize: 16)),
               ),

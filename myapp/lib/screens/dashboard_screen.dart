@@ -1,51 +1,77 @@
-import 'dart:developer' as developer;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:rxdart/rxdart.dart';
-
-import 'package:myapp/models/property_model.dart';
-import 'package:myapp/models/rent_record_model.dart';
-import 'package:myapp/models/rent_status.dart';
-import 'package:myapp/models/tenant_model.dart';
-import 'package:myapp/models/unit_model.dart';
 import 'package:myapp/models/user_model.dart';
-import 'package:myapp/models/action_item_model.dart';
-import 'package:myapp/models/transaction_model.dart';
 import 'package:myapp/services/auth_service.dart';
 import 'package:myapp/services/database_service.dart';
-import 'package:myapp/screens/add_property_screen.dart';
-import 'package:myapp/screens/tenant_detail_screen.dart';
-import 'package:myapp/services/notification_service.dart';
 import 'package:myapp/providers/theme_provider.dart';
+import 'package:myapp/screens/add_property_screen.dart';
+import 'package:myapp/screens/property_list_screen.dart';
+import 'package:myapp/screens/all_transactions_screen.dart';
+import 'package:myapp/utils/currency_helper.dart';
+import 'package:intl/intl.dart';
+import 'package:rxdart/rxdart.dart';
+import 'package:myapp/models/action_item_model.dart';
+import 'package:myapp/services/notification_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:myapp/models/property_model.dart';
+import 'package:myapp/models/unit_model.dart';
+import 'package:myapp/models/rent_record_model.dart';
+import 'package:myapp/models/rent_status.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:developer' as developer;
 
-Future<Map<String, dynamic>> _calculateSummary(Map<String, dynamic> data) async {
-  final properties = data['properties'] as List<PropertyModel>? ?? [];
-  final units = data['units'] as List<UnitModel>? ?? [];
-  final transactions = data['transactions'] as List<TransactionModel>? ?? [];
+Map<String, dynamic> _calculateSummary(Map<String, dynamic> data) {
+  final properties = data['properties'] as List<PropertyModel>;
+  final units = data['units'] as List<UnitModel>;
+  final records = data['records'] as List<RentRecordModel>;
 
   final occupiedUnits = units.where((unit) => unit.isOccupied).toList();
-  final occupiedUnitsCount = occupiedUnits.length;
-  final totalExpectedRent = occupiedUnits.fold<double>(0, (sum, unit) => sum + unit.monthlyRent);
+  
+  final pendingTotal = records
+      .where((r) => r.status != RentStatus.paid)
+      .fold<double>(0, (sum, r) => sum + r.amount);
 
-  final now = DateTime.now();
-  final paidRent = transactions
-      .where((tx) => tx.type == TransactionType.income && tx.date.year == now.year && tx.date.month == now.month)
-      .fold<double>(0, (sum, tx) => sum + tx.amount);
+  final collectedTotal = records
+      .where((r) => r.status == RentStatus.paid)
+      .fold<double>(0, (sum, r) => sum + r.amount);
 
   return {
     'propertiesCount': properties.length,
     'unitsCount': units.length,
-    'occupiedUnits': occupiedUnitsCount,
-    'totalRent': totalExpectedRent,
-    'paidRent': paidRent,
+    'occupiedUnits': occupiedUnits.length,
+    'pendingTotal': pendingTotal,
+    'collectedTotal': collectedTotal,
   };
 }
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _upcomingRentsKey = GlobalKey();
+
+  void _scrollToUpcomingRents() {
+    final context = _upcomingRentsKey.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,9 +92,12 @@ class DashboardScreen extends StatelessWidget {
 
           final user = snapshot.data!;
           final databaseService = Provider.of<DatabaseService>(context, listen: false);
-          final currentMonth = DateFormat('yyyy-MM').format(DateTime.now());
+
+          // Sync rent records when viewing dashboard
+          databaseService.ensureRentRecordsExist(user.uid);
 
           return CustomScrollView(
+            controller: _scrollController,
             slivers: [
               _buildModernHeroHeader(context, user, authService),
               SliverToBoxAdapter(
@@ -90,10 +119,11 @@ class DashboardScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          _buildSummaryCards(databaseService, user.uid, currentMonth),
+                          _buildSummaryCards(databaseService, user),
                           const SizedBox(height: 32),
                           Text(
-                            'Action Center',
+                            'Upcoming Rents (7 days)',
+                            key: _upcomingRentsKey,
                             style: GoogleFonts.inter(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -101,8 +131,8 @@ class DashboardScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          _buildUnpaidTenantsList(databaseService, user.uid),
-                          const SizedBox(height: 100), // spacing for bottom nav
+                          _ActionCenterList(databaseService: databaseService, user: user),
+                          const SizedBox(height: 100),
                         ],
                       ),
                     ),
@@ -126,7 +156,6 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildModernHeroHeader(BuildContext context, UserModel user, AuthService authService) {
-    final isDesktop = MediaQuery.of(context).size.width > 900;
     return SliverAppBar(
       expandedHeight: 110.0,
       backgroundColor: Colors.white,
@@ -134,12 +163,6 @@ class DashboardScreen extends StatelessWidget {
       elevation: 0,
       scrolledUnderElevation: 1,
       automaticallyImplyLeading: false,
-      leading: !isDesktop
-          ? Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Image.asset('assets/images/logo_icon.png', fit: BoxFit.contain),
-            )
-          : null,
       title: Image.asset('assets/images/logo_full.png', height: 28),
       centerTitle: true,
       actions: [
@@ -164,7 +187,7 @@ class DashboardScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Good Morning,',
+                'Welcome,',
                 style: GoogleFonts.inter(fontSize: 16, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 4),
@@ -183,12 +206,12 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryCards(DatabaseService databaseService, String ownerId, String currentMonth) {
+  Widget _buildSummaryCards(DatabaseService databaseService, UserModel user) {
     final summaryStream = CombineLatestStream.combine3(
-      databaseService.getProperties(ownerId).onErrorReturn(<PropertyModel>[]),
-      databaseService.allUnits(ownerId).onErrorReturn(<UnitModel>[]),
-      databaseService.allTransactions(ownerId).onErrorReturn(<TransactionModel>[]),
-      (List<PropertyModel> p, List<UnitModel> u, List<TransactionModel> t) => {'properties': p, 'units': u, 'transactions': t},
+      databaseService.getProperties(user.uid).onErrorReturn(<PropertyModel>[]),
+      databaseService.allUnits(user.uid).onErrorReturn(<UnitModel>[]),
+      FirebaseFirestore.instance.collection('rent_records').where('ownerId', isEqualTo: user.uid).snapshots().map((s) => s.docs.map((d) => RentRecordModel.fromFirestore(d)).toList()),
+      (List<PropertyModel> p, List<UnitModel> u, List<RentRecordModel> r) => {'properties': p, 'units': u, 'records': r},
     ).debounceTime(const Duration(milliseconds: 300));
 
     return StreamBuilder<Map<String, dynamic>>(
@@ -199,12 +222,12 @@ class DashboardScreen extends StatelessWidget {
         }
 
         return FutureBuilder<Map<String, dynamic>>(
-          future: compute(_calculateSummary, snapshot.data ?? {}),
+          future: compute(_calculateSummary, snapshot.data!),
           builder: (context, futureSnapshot) {
-             if (!futureSnapshot.hasData) return const SizedBox.shrink();
-             final data = futureSnapshot.data!;
+            if (!futureSnapshot.hasData) return const SizedBox.shrink();
+            final data = futureSnapshot.data!;
 
-             return GridView.count(
+            return GridView.count(
               crossAxisCount: MediaQuery.of(context).size.width > 800 ? 4 : 2,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -212,10 +235,31 @@ class DashboardScreen extends StatelessWidget {
               mainAxisSpacing: 16,
               childAspectRatio: MediaQuery.of(context).size.width > 800 ? 1.4 : 1.2,
               children: [
-                _buildKpiCard(context, 'Properties', '${data['propertiesCount']}', Icons.apartment_rounded, ThemeProvider.accentBlue),
+                _buildKpiCard(
+                  context, 
+                  'Properties', 
+                  '${data['propertiesCount']}', 
+                  Icons.apartment_rounded, 
+                  ThemeProvider.accentBlue,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PropertyListScreen())),
+                ),
                 _buildKpiCard(context, 'Occupancy', '${data['occupiedUnits']}/${data['unitsCount']}', Icons.door_front_door_rounded, Colors.teal),
-                _buildKpiCard(context, 'Expected', '\$${(data['totalRent'] as double).toStringAsFixed(0)}', Icons.payments_outlined, Colors.orange),
-                _buildKpiCard(context, 'Collected', '\$${(data['paidRent'] as double).toStringAsFixed(0)}', Icons.account_balance_wallet_rounded, Colors.purple),
+                _buildKpiCard(
+                  context, 
+                  'Pending Rents', 
+                  CurrencyHelper.formatNoDecimal(data['pendingTotal'] as double, user.currency), 
+                  Icons.pending_actions_rounded, 
+                  Colors.red.shade600,
+                  onTap: _scrollToUpcomingRents,
+                ),
+                _buildKpiCard(
+                  context, 
+                  'Collected', 
+                  CurrencyHelper.formatNoDecimal(data['collectedTotal'] as double, user.currency), 
+                  Icons.account_balance_wallet_rounded, 
+                  Colors.purple,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AllTransactionsScreen())),
+                ),
               ],
             );
           },
@@ -224,61 +268,107 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildKpiCard(BuildContext context, String title, String value, IconData icon, Color accent) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title, 
-                style: GoogleFonts.inter(
-                  color: Colors.grey.shade600, 
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+  Widget _buildKpiCard(BuildContext context, String title, String value, IconData icon, Color accent, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            if (onTap != null) BoxShadow(color: accent.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 4)),
+          ],
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: accent.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                  child: Icon(icon, color: accent, size: 24),
                 ),
-              ),
-              Icon(icon, color: accent.withOpacity(0.5), size: 24),
-            ],
-          ),
-          Text(
-            value, 
-            style: GoogleFonts.inter(
-              fontSize: 28,
-              fontWeight: FontWeight.bold, 
-              color: ThemeProvider.primaryNavy,
+                if (onTap != null) Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Colors.grey.shade400),
+              ],
             ),
-          ),
-        ],
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: ThemeProvider.primaryNavy))),
+                Text(title, style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
+}
 
-  Widget _buildUnpaidTenantsList(DatabaseService databaseService, String ownerId) {
+class _ActionCenterList extends StatefulWidget {
+  final DatabaseService databaseService;
+  final UserModel user;
+
+  const _ActionCenterList({required this.databaseService, required this.user});
+
+  @override
+  State<_ActionCenterList> createState() => _ActionCenterListState();
+}
+
+class _ActionCenterListState extends State<_ActionCenterList> {
+  final Set<String> _selectedKeys = {};
+  bool _isProcessing = false;
+
+  String _itemKey(ActionItem item) => item.rentRecordId ?? '${item.tenant.id}_${item.month}';
+
+  Future<void> _recordPayment(ActionItem item) async {
+    await widget.databaseService.recordRentPayment(
+      item: item,
+      ownerId: widget.user.uid,
+    );
+  }
+
+  Future<void> _recordSelectedPayments(List<ActionItem> allItems) async {
+    if (_selectedKeys.isEmpty) return;
+    setState(() => _isProcessing = true);
+    final selected = allItems.where((item) => _selectedKeys.contains(_itemKey(item))).toList();
+    int success = 0;
+    for (final item in selected) {
+      try {
+        await _recordPayment(item);
+        success++;
+      } catch (_) {}
+    }
+    if (mounted) {
+      setState(() {
+        _selectedKeys.clear();
+        _isProcessing = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$success payment(s) recorded successfully!')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return StreamBuilder<List<ActionItem>>(
-      stream: databaseService.getActionItems(ownerId).debounceTime(const Duration(milliseconds: 300)),
+      stream: widget.databaseService.getActionItems(widget.user.uid).debounceTime(const Duration(milliseconds: 300)),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox.shrink();
         final actionItems = snapshot.data!;
-        
-        final user = Provider.of<UserModel?>(context, listen: false);
-        if (!kIsWeb && user != null) {
-          if (user.notificationsEnabled) {
-            NotificationService().scheduleRentReminders(actionItems, user.notificationTime, user.notificationFrequency);
-          } else {
-            NotificationService().cancelAllNotifications();
-          }
+
+        if (!kIsWeb && widget.user.notificationsEnabled) {
+          NotificationService().scheduleRentReminders(actionItems, widget.user.notificationTime, widget.user.notificationFrequency);
+        } else if (!kIsWeb) {
+          NotificationService().cancelAllNotifications();
         }
-        
+
         if (actionItems.isEmpty) {
           return Container(
             width: double.infinity,
@@ -292,79 +382,112 @@ class DashboardScreen extends StatelessWidget {
               children: [
                 Icon(Icons.check_circle_outline_rounded, color: Colors.green.shade400, size: 64),
                 const SizedBox(height: 16),
-                Text('You are all caught up!', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 20, color: ThemeProvider.primaryNavy)),
-                const SizedBox(height: 8),
-                Text('No upcoming dues or overdue rent at this time.', style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
+                Text('All caught up!', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                Text('No upcoming rent payments.', style: GoogleFonts.inter(color: Colors.grey.shade600)),
               ],
             ),
           );
         }
 
         return Column(
-          children: actionItems.map((item) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                leading: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: item.isOverdue ? Colors.red.withOpacity(0.08) : Colors.orange.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    item.isOverdue ? Icons.warning_rounded : Icons.calendar_today_rounded, 
-                    color: item.isOverdue ? Colors.redAccent : Colors.orange,
-                  ),
-                ),
-                title: Text(item.title, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 4.0),
-                  child: Text(item.subtitle, style: TextStyle(color: Colors.grey.shade600)),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_selectedKeys.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('\$${item.amount.toStringAsFixed(0)}', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, color: ThemeProvider.primaryNavy)),
-                    const SizedBox(width: 16),
-                    ElevatedButton(
+                    Text('${_selectedKeys.length} selected', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                    ElevatedButton.icon(
+                      onPressed: _isProcessing ? null : () => _recordSelectedPayments(actionItems),
+                      icon: _isProcessing ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.check_rounded),
+                      label: const Text('Mark Received'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: ThemeProvider.accentBlue,
+                        backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                      onPressed: () async {
-                        try {
-                          await databaseService.recordRentPayment(
-                            tenantId: item.tenant.id,
-                            propertyId: item.tenant.propertyId,
-                            unitId: item.tenant.assignedUnitId,
-                            amount: item.amount,
-                            month: item.month,
-                          );
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment recorded successfully!')));
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to record payment.')));
-                          }
-                        }
-                      },
-                      child: const Text('Pay', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TenantDetailScreen(tenant: item.tenant))),
               ),
-            );
-          }).toList(),
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: actionItems.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final item = actionItems[index];
+                final isSelected = _selectedKeys.contains(_itemKey(item));
+
+                return Container(
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.blue.shade50 : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: isSelected ? ThemeProvider.accentBlue : Colors.grey.shade200),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    onTap: () {
+                      setState(() {
+                        if (isSelected) {
+                          _selectedKeys.remove(_itemKey(item));
+                        } else {
+                          _selectedKeys.add(_itemKey(item));
+                        }
+                      });
+                    },
+                    leading: Checkbox(
+                      value: isSelected,
+                      onChanged: (val) {
+                        setState(() {
+                          if (val == true) {
+                            _selectedKeys.add(_itemKey(item));
+                          } else {
+                            _selectedKeys.remove(_itemKey(item));
+                          }
+                        });
+                      },
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    ),
+                    title: Text(item.title, style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.subtitle, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600)),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (item.isOverdue ? Colors.red : Colors.orange).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            item.month,
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: item.isOverdue ? Colors.red : Colors.orange),
+                          ),
+                        ),
+                      ],
+                    ),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          CurrencyHelper.formatNoDecimal(item.amount, widget.user.currency),
+                          style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: ThemeProvider.primaryNavy),
+                        ),
+                        Text('Rent', style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         );
       },
     );

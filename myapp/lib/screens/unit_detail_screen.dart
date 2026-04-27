@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:myapp/models/unit_model.dart';
 import 'package:myapp/models/tenant_model.dart';
+import 'package:myapp/models/user_model.dart';
 import 'package:myapp/models/transaction_model.dart';
 import 'package:myapp/services/database_service.dart';
 import 'package:myapp/screens/edit_unit_screen.dart';
 import 'package:myapp/screens/add_transaction_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:myapp/providers/theme_provider.dart';
+import 'package:myapp/utils/currency_helper.dart';
 
 class UnitDetailScreen extends StatelessWidget {
   final UnitModel unit;
@@ -17,7 +19,7 @@ class UnitDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final databaseService = Provider.of<DatabaseService>(context);
-    final currencyFormat = NumberFormat.currency(locale: 'en_US', symbol: '\$');
+    final user = Provider.of<UserModel?>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -38,11 +40,11 @@ class UnitDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildUnitInfoCard(context, currencyFormat),
+            _buildUnitInfoCard(context, user?.currency),
             const SizedBox(height: 24),
             _buildTenantInfo(context, databaseService),
             const SizedBox(height: 24),
-            _buildRecentTransactions(databaseService),
+            _buildRecentTransactions(databaseService, user?.currency),
             const SizedBox(height: 80),
           ],
         ),
@@ -56,7 +58,7 @@ class UnitDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildUnitInfoCard(BuildContext context, NumberFormat currencyFormat) {
+  Widget _buildUnitInfoCard(BuildContext context, String? currency) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -99,7 +101,7 @@ class UnitDetailScreen extends StatelessWidget {
           Row(
             children: [
               Expanded(child: _buildInfoMetric(context, Icons.square_foot_rounded, 'Area', '${unit.sqft} sqft')),
-              Expanded(child: _buildInfoMetric(context, Icons.payments_outlined, 'Rent', currencyFormat.format(unit.monthlyRent))),
+              Expanded(child: _buildInfoMetric(context, Icons.payments_outlined, 'Rent', CurrencyHelper.format(unit.monthlyRent, currency))),
             ],
           ),
         ],
@@ -242,7 +244,7 @@ class UnitDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentTransactions(DatabaseService databaseService) {
+  Widget _buildRecentTransactions(DatabaseService databaseService, String? currency) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -301,7 +303,7 @@ class UnitDetailScreen extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${isIncome ? '+' : '-'}\$${tx.amount.toStringAsFixed(2)}',
+                        '${isIncome ? '+' : '-'}${CurrencyHelper.format(tx.amount, currency)}',
                         style: TextStyle(color: isIncome ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                     ],

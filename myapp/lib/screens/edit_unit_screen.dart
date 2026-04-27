@@ -121,8 +121,14 @@ class _EditUnitScreenState extends State<EditUnitScreen> {
                   labelText: 'Rent Due Day of Month',
                   prefixIcon: Icon(Icons.calendar_today_outlined),
                 ),
-                items: List.generate(28, (index) => index + 1)
-                    .map((day) => DropdownMenuItem(value: day, child: Text(day.toString())))
+                items: List.generate(31, (index) => index + 1)
+                    .map((day) {
+                      String suffix = 'th';
+                      if (day % 10 == 1 && day % 100 != 11) suffix = 'st';
+                      else if (day % 10 == 2 && day % 100 != 12) suffix = 'nd';
+                      else if (day % 10 == 3 && day % 100 != 13) suffix = 'rd';
+                      return DropdownMenuItem(value: day, child: Text('$day$suffix'));
+                    })
                     .toList(),
                 onChanged: (value) {
                   if (value != null) setState(() => _rentDueDate = value);
