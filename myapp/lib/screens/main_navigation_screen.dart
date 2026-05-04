@@ -1,30 +1,41 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:myapp/screens/dashboard_screen.dart';
-import 'package:myapp/screens/property_list_screen.dart';
-import 'package:myapp/screens/tenant_list_screen.dart';
-import 'package:myapp/screens/settings_screen.dart';
+import 'package:go_router/go_router.dart';
 import 'package:myapp/providers/theme_provider.dart';
 
-class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+class MainNavigationScreen extends StatelessWidget {
+  final Widget child;
 
-  @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
-}
+  const MainNavigationScreen({super.key, required this.child});
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 0;
+  int _calculateSelectedIndex(BuildContext context) {
+    final String location = GoRouterState.of(context).matchedLocation;
+    if (location.startsWith('/properties') || location.startsWith('/property')) return 1;
+    if (location.startsWith('/tenants') || location.startsWith('/tenant')) return 2;
+    if (location.startsWith('/profile')) return 3;
+    return 0; // Dashboard
+  }
 
-  final List<Widget> _screens = [
-    const DashboardScreen(),
-    const PropertyListScreen(),
-    const TenantListScreen(),
-    const SettingsScreen(), // Profiling/Settings
-  ];
+  void _onItemTapped(int index, BuildContext context) {
+    switch (index) {
+      case 0:
+        context.go('/');
+        break;
+      case 1:
+        context.go('/properties');
+        break;
+      case 2:
+        context.go('/tenants');
+        break;
+      case 3:
+        context.go('/profile');
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final selectedIndex = _calculateSelectedIndex(context);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth > 800) {
@@ -32,21 +43,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             body: Row(
               children: [
                 NavigationRail(
-                  selectedIndex: _currentIndex,
+                  selectedIndex: selectedIndex,
                   backgroundColor: Colors.white,
                   leading: Padding(
                     padding: const EdgeInsets.only(top: 16.0, bottom: 32.0),
                     child: Image.asset('assets/images/logo_icon.png', height: 40),
                   ),
-                  selectedIconTheme: IconThemeData(color: ThemeProvider.accentBlue, size: 28),
+                  selectedIconTheme: const IconThemeData(color: ThemeProvider.accentBlue, size: 28),
                   unselectedIconTheme: IconThemeData(color: Colors.grey.shade400, size: 24),
-                  selectedLabelTextStyle: TextStyle(color: ThemeProvider.accentBlue, fontWeight: FontWeight.bold, fontSize: 13),
+                  selectedLabelTextStyle: const TextStyle(color: ThemeProvider.accentBlue, fontWeight: FontWeight.bold, fontSize: 13),
                   unselectedLabelTextStyle: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-                  onDestinationSelected: (int index) {
-                    setState(() {
-                      _currentIndex = index;
-                    });
-                  },
+                  onDestinationSelected: (index) => _onItemTapped(index, context),
                   labelType: NavigationRailLabelType.all,
                   destinations: const [
                     NavigationRailDestination(
@@ -72,62 +79,32 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   ],
                 ),
                 VerticalDivider(thickness: 1, width: 1, color: Colors.grey.shade200),
-                Expanded(
-                  child: IndexedStack(
-                    index: _currentIndex,
-                    children: _screens,
-                  ),
-                ),
+                Expanded(child: child),
               ],
             ),
           );
         }
 
         return Scaffold(
-          body: IndexedStack(
-            index: _currentIndex,
-            children: _screens,
-          ),
+          body: child,
           bottomNavigationBar: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Colors.grey.shade200)),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, -5))],
             ),
             child: BottomNavigationBar(
+              currentIndex: selectedIndex,
+              onTap: (index) => _onItemTapped(index, context),
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.white,
-              elevation: 0,
               selectedItemColor: ThemeProvider.accentBlue,
               unselectedItemColor: Colors.grey.shade400,
               selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              unselectedLabelStyle: const TextStyle(fontSize: 11),
-              currentIndex: _currentIndex,
-              onTap: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
+              unselectedLabelStyle: const TextStyle(fontSize: 12),
               items: const [
-                BottomNavigationBarItem(
-                  icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.dashboard_outlined)),
-                  activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.dashboard_rounded)),
-                  label: 'Home',
-                ),
-                BottomNavigationBarItem(
-                  icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.apartment_outlined)),
-                  activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.apartment_rounded)),
-                  label: 'Properties',
-                ),
-                BottomNavigationBarItem(
-                  icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.people_outline_rounded)),
-                  activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.people_rounded)),
-                  label: 'Tenants',
-                ),
-                BottomNavigationBarItem(
-                  icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.person_outline_rounded)),
-                  activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.person_rounded)),
-                  label: 'Profile',
-                ),
+                BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard_rounded), label: 'Home'),
+                BottomNavigationBarItem(icon: Icon(Icons.apartment_outlined), activeIcon: Icon(Icons.apartment_rounded), label: 'Properties'),
+                BottomNavigationBarItem(icon: Icon(Icons.people_outline_rounded), activeIcon: Icon(Icons.people_rounded), label: 'Tenants'),
+                BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), activeIcon: Icon(Icons.person_rounded), label: 'Profile'),
               ],
             ),
           ),

@@ -69,6 +69,7 @@ class UserModel {
   UserModel copyWith({
     String? name,
     String? email,
+    String? photoUrl,
     String? phone,
     String? plan,
     String? currency,
@@ -78,7 +79,7 @@ class UserModel {
   }) {
     return UserModel(
       uid: uid,
-      photoUrl: photoUrl,
+      photoUrl: photoUrl ?? this.photoUrl,
       name: name ?? this.name,
       email: email ?? this.email,
       phone: phone ?? this.phone,

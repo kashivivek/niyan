@@ -8,6 +8,8 @@ import 'dart:developer' as developer;
 // NOTE: We avoid importing dart:html directly as it breaks mobile builds.
 // For web notifications, we would ideally use a conditional import or a plugin that supports all platforms.
 
+import 'package:universal_html/html.dart' as html;
+
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -53,9 +55,13 @@ class NotificationService {
 
   Future<bool> requestPermissions() async {
     if (kIsWeb) {
-      // On web, we would use html.Notification.requestPermission()
-      // For now, we skip to avoid build errors on mobile.
-      return true;
+      try {
+        final permission = await html.Notification.requestPermission();
+        return permission == 'granted';
+      } catch (e) {
+        developer.log('Web notification permission error', error: e);
+        return false;
+      }
     }
 
     bool? androidGranted = false;
@@ -91,8 +97,22 @@ class NotificationService {
   }
 
   Future<void> showImmediateNotification(String title, String body) async {
+    developer.log('Showing immediate notification: $title - $body');
     if (kIsWeb) {
-      debugPrint('Web Notification: $title - $body');
+      if (!html.Notification.supported) {
+        developer.log('Web notifications are not supported in this browser.');
+        return;
+      }
+      
+      if (html.Notification.permission == 'granted') {
+        html.Notification(title, body: body);
+      } else {
+        developer.log('Notification permission not granted. Current state: ${html.Notification.permission}');
+        final granted = await requestPermissions();
+        if (granted) {
+          html.Notification(title, body: body);
+        }
+      }
       return;
     }
 
@@ -110,6 +130,14 @@ class NotificationService {
         ),
         iOS: DarwinNotificationDetails(),
       ),
+    );
+  }
+
+
+  Future<void> sendTestNotification() async {
+    await showImmediateNotification(
+      'Test Notification',
+      'This is a test notification from Niyan Property Management.',
     );
   }
 
@@ -136,10 +164,13 @@ class NotificationService {
       
       tz.TZDateTime scheduledDate = _nextInstanceOfTime(hour, minute);
 
+      developer.log('Scheduling notification for ${item.tenant.name} at $scheduledDate');
+      
       if (frequency == 'On Due Date') {
         final dueDate = item.dueDate;
         final scheduleTime = tz.TZDateTime.local(dueDate.year, dueDate.month, dueDate.day, hour, minute);
         if (scheduleTime.isBefore(tz.TZDateTime.now(tz.local))) {
+            developer.log('Skipping ${item.tenant.name} - due date is in the past.');
             continue;
         }
         scheduledDate = scheduleTime;
@@ -158,8 +189,13 @@ class NotificationService {
               channelDescription: 'Notifications for upcoming or overdue rent payments.',
               importance: Importance.max,
               priority: Priority.high,
+              showWhen: true,
             ),
-            iOS: DarwinNotificationDetails(),
+            iOS: DarwinNotificationDetails(
+              presentAlert: true,
+              presentBadge: true,
+              presentSound: true,
+            ),
           ),
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
           matchDateTimeComponents: frequency == 'Daily' ? DateTimeComponents.time : 
@@ -174,9 +210,12 @@ class NotificationService {
   tz.TZDateTime _nextInstanceOfTime(int hour, int minute) {
     final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
     tz.TZDateTime scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+    
+    // If it's already past this time today, schedule for tomorrow
     if (scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
     return scheduledDate;
   }
 }
+

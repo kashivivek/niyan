@@ -7,10 +7,10 @@ import 'package:myapp/services/auth_service.dart';
 import 'package:myapp/services/database_service.dart';
 import 'package:myapp/services/image_service.dart';
 import 'package:myapp/providers/theme_provider.dart';
-import 'package:myapp/screens/wrapper.dart';
 import 'package:myapp/firebase_options.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:myapp/services/notification_service.dart';
+import 'package:myapp/router/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,30 +27,45 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late final AuthService _authService;
+  late final AppRouter _appRouter;
+
+  @override
+  void initState() {
+    super.initState();
+    _authService = AuthService();
+    _appRouter = AppRouter(_authService);
+  }
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => ThemeProvider()),
-        Provider<AuthService>(create: (_) => AuthService()),
+        Provider<AuthService>.value(value: _authService),
         Provider<DatabaseService>(create: (_) => DatabaseService()),
         Provider<ImageService>(create: (_) => ImageService()),
         StreamProvider<UserModel?>(
-          create: (context) => context.read<AuthService>().user,
+          create: (context) => _authService.user,
           initialData: null,
         ),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
-          return MaterialApp(
-            title: 'Property Manager',
+          return MaterialApp.router(
+            title: 'Niyan',
             theme: ThemeProvider.lightTheme,
             darkTheme: ThemeProvider.darkTheme,
             themeMode: themeProvider.themeMode,
-            home: const Wrapper(),
+            routerConfig: _appRouter.router,
             debugShowCheckedModeBanner: false,
           );
         },

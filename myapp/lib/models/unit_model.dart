@@ -16,6 +16,7 @@ class UnitModel {
   final List<String> previousTenantIds;
   final double balanceDue;
   final DateTime? rentPaymentDate;
+  final DateTime? lastVacatedDate;
 
   UnitModel({
     required this.id,
@@ -33,6 +34,7 @@ class UnitModel {
     this.previousTenantIds = const [],
     this.balanceDue = 0.0,
     this.rentPaymentDate,
+    this.lastVacatedDate,
   });
 
   bool get isOccupied => currentTenantId != null && currentTenantId!.isNotEmpty;
@@ -54,8 +56,9 @@ class UnitModel {
       currentTenantId: data['currentTenantId'] as String?,
       currentTenancyHistoryId: data['currentTenancyHistoryId'] as String?,
       previousTenantIds: List<String>.from(data['previousTenantIds'] ?? []),
-      balanceDue: (data['balanceDue'] as num?)?.toDouble() ?? 0.0,
-      rentPaymentDate: (data['rentPaymentDate'] as Timestamp?)?.toDate(),
+      balanceDue: (data['balanceDue'] ?? 0).toDouble(),
+      rentPaymentDate: data['rentPaymentDate'] != null ? (data['rentPaymentDate'] as Timestamp).toDate() : null,
+      lastVacatedDate: data['lastVacatedDate'] != null ? (data['lastVacatedDate'] as Timestamp).toDate() : null,
     );
   }
 
@@ -74,7 +77,8 @@ class UnitModel {
       'currentTenancyHistoryId': currentTenancyHistoryId,
       'previousTenantIds': previousTenantIds,
       'balanceDue': balanceDue,
-      'rentPaymentDate': rentPaymentDate,
+      'rentPaymentDate': rentPaymentDate != null ? Timestamp.fromDate(rentPaymentDate!) : null,
+      'lastVacatedDate': lastVacatedDate != null ? Timestamp.fromDate(lastVacatedDate!) : null,
     };
   }
 
@@ -94,6 +98,7 @@ class UnitModel {
     List<String>? previousTenantIds,
     double? balanceDue,
     DateTime? rentPaymentDate,
+    DateTime? lastVacatedDate,
   }) {
     return UnitModel(
       id: id ?? this.id,
@@ -111,6 +116,7 @@ class UnitModel {
       previousTenantIds: previousTenantIds ?? this.previousTenantIds,
       balanceDue: balanceDue ?? this.balanceDue,
       rentPaymentDate: rentPaymentDate ?? this.rentPaymentDate,
+      lastVacatedDate: lastVacatedDate ?? this.lastVacatedDate,
     );
   }
 }

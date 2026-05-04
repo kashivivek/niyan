@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,10 +7,11 @@ import 'package:myapp/services/database_service.dart';
 import 'package:myapp/services/image_service.dart';
 import 'package:intl/intl.dart';
 import 'package:myapp/widgets/responsive_centered.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:io' as io;
 
 class EditTenantScreen extends StatefulWidget {
   final TenantModel tenant;
-
   const EditTenantScreen({super.key, required this.tenant});
 
   @override
@@ -22,11 +22,11 @@ class EditTenantScreenState extends State<EditTenantScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
-  late TextEditingController _altPhoneController; // #6
+  late TextEditingController _altPhoneController;
+  late TextEditingController _depositController;
   DateTime? _moveInDate;
-  File? _image;
+  XFile? _image;
   final ImagePicker _picker = ImagePicker();
-  bool _isLoading = false;
 
   @override
   void initState() {
@@ -34,22 +34,15 @@ class EditTenantScreenState extends State<EditTenantScreen> {
     _nameController = TextEditingController(text: widget.tenant.name);
     _phoneController = TextEditingController(text: widget.tenant.phoneNumber ?? '');
     _altPhoneController = TextEditingController(text: widget.tenant.alternatePhone ?? '');
+    _depositController = TextEditingController(text: widget.tenant.securityDeposit.toString());
     _moveInDate = widget.tenant.moveInDate;
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _altPhoneController.dispose();
-    super.dispose();
   }
 
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
-        _image = File(pickedFile.path);
+        _image = pickedFile;
       });
     }
   }
@@ -77,14 +70,12 @@ class EditTenantScreenState extends State<EditTenantScreen> {
         return;
       }
 
-      setState(() => _isLoading = true);
-
       final updatedTenant = widget.tenant.copyWith(
         name: _nameController.text,
         phoneNumber: _phoneController.text.isNotEmpty ? _phoneController.text : null,
         alternatePhone: _altPhoneController.text.isNotEmpty ? _altPhoneController.text : null,
-        // due date is now per unit — keep existing value
         moveInDate: _moveInDate!,
+        securityDeposit: double.tryParse(_depositController.text) ?? widget.tenant.securityDeposit,
       );
 
       try {
@@ -94,9 +85,9 @@ class EditTenantScreenState extends State<EditTenantScreen> {
         await databaseService.updateTenant(updatedTenant);
 
         if (_image != null) {
-          final imageUrl = await imageService.uploadTenantPhoto(updatedTenant.id, _image!);
+          final imageUrl = await imageService.uploadTenantPhoto(widget.tenant.id, _image);
           if (imageUrl != null) {
-            await databaseService.updateTenantPhotoUrl(updatedTenant.id, imageUrl);
+            await databaseService.updateTenantPhotoUrl(widget.tenant.id, imageUrl);
           }
         }
 
@@ -106,16 +97,28 @@ class EditTenantScreenState extends State<EditTenantScreen> {
             const SnackBar(content: Text('Tenant updated successfully!')),
           );
         }
-      } catch (e, s) {
-        developer.log('Failed to update tenant', name: 'edit_tenant.error', error: e, stackTrace: s);
+      } catch (e) {
+        developer.log('Error updating tenant: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to update tenant: $e')),
+            SnackBar(content: Text('Error updating tenant: $e')),
           );
         }
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Widget _buildImagePreview() {
+    if (_image == null) {
+      if (widget.tenant.photoUrl != null && widget.tenant.photoUrl!.isNotEmpty) {
+        return Image.network(widget.tenant.photoUrl!, fit: BoxFit.cover);
+      }
+      return const Icon(Icons.add_a_photo, size: 50, color: Colors.grey);
+    }
+    if (kIsWeb) {
+      return Image.network(_image!.path, fit: BoxFit.cover);
+    } else {
+      return Image.file(io.File(_image!.path), fit: BoxFit.cover);
     }
   }
 
@@ -126,103 +129,65 @@ class EditTenantScreenState extends State<EditTenantScreen> {
         title: const Text('Edit Tenant'),
       ),
       body: ResponsiveCentered(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Center(
-                child: GestureDetector(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                GestureDetector(
                   onTap: _pickImage,
-                  child: CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Colors.grey[200],
-                    backgroundImage: _image != null
-                        ? FileImage(_image!)
-                        : (widget.tenant.photoUrl != null && widget.tenant.photoUrl!.isNotEmpty
-                            ? NetworkImage(widget.tenant.photoUrl!) as ImageProvider
-                            : null),
-                    child: _image == null && (widget.tenant.photoUrl == null || widget.tenant.photoUrl!.isEmpty)
-                        ? Icon(Icons.camera_alt, color: Colors.grey[800], size: 40)
-                        : null,
+                  child: Container(
+                    height: 150,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: _buildImagePreview(),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Full Name',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                  validator: (value) =>
+                      value == null || value.isEmpty ? 'Please enter a name' : null,
                 ),
-                validator: (value) => value!.isEmpty ? 'Please enter a name' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Phone Number',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _phoneController,
+                  decoration: const InputDecoration(labelText: 'Phone Number'),
+                  keyboardType: TextInputType.phone,
                 ),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
-              // #6: Alternate phone number field
-              TextFormField(
-                controller: _altPhoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Alternate Phone Number (Optional)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone_forwarded_outlined),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _altPhoneController,
+                  decoration: const InputDecoration(labelText: 'Alternate Phone Number'),
+                  keyboardType: TextInputType.phone,
                 ),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
-              // #7: Rent Amount field removed — managed at unit level
-              _buildDatePicker(
-                context: context,
-                label: 'Move-in Date',
-                date: _moveInDate,
-                onPressed: () => _selectDate(context),
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _submitForm,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _depositController,
+                  decoration: const InputDecoration(labelText: 'Security Deposit'),
+                  keyboardType: TextInputType.number,
                 ),
-                child: _isLoading
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Save Changes', style: TextStyle(fontSize: 16)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDatePicker({
-    required BuildContext context,
-    required String label,
-    required DateTime? date,
-    required VoidCallback onPressed,
-  }) {
-    return InkWell(
-      onTap: onPressed,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-          prefixIcon: const Icon(Icons.calendar_today),
-        ),
-        child: Text(
-          date != null ? DateFormat.yMMMd().format(date) : 'Select a date',
-          style: TextStyle(
-            color: date != null ? Theme.of(context).textTheme.bodyLarge?.color : Theme.of(context).hintColor,
+                const SizedBox(height: 16),
+                ListTile(
+                  title: const Text('Move-In Date'),
+                  subtitle: Text(_moveInDate == null
+                      ? 'Not selected'
+                      : DateFormat('MMM dd, yyyy').format(_moveInDate!)),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () => _selectDate(context),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: _submitForm,
+                  child: const Text('Update Tenant'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

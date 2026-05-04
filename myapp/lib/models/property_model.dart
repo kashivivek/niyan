@@ -2,6 +2,34 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum PropertyType { flat, house, shop, pg }
 
+class MaintenanceContact {
+  final String name;
+  final String category;
+  final String phone;
+
+  MaintenanceContact({
+    required this.name,
+    required this.category,
+    required this.phone,
+  });
+
+  factory MaintenanceContact.fromMap(Map<String, dynamic> map) {
+    return MaintenanceContact(
+      name: map['name'] ?? '',
+      category: map['category'] ?? '',
+      phone: map['phone'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'category': category,
+      'phone': phone,
+    };
+  }
+}
+
 class PropertyModel {
   final String id;
   final String name;
@@ -10,6 +38,7 @@ class PropertyModel {
   final String? imageUrl;
   final PropertyType type;
   final String ownerId;
+  final List<MaintenanceContact> maintenanceContacts;
 
   PropertyModel({
     required this.id,
@@ -19,6 +48,7 @@ class PropertyModel {
     this.imageUrl,
     required this.type,
     required this.ownerId,
+    this.maintenanceContacts = const [],
   });
 
   factory PropertyModel.fromFirestore(DocumentSnapshot doc) {
@@ -34,6 +64,9 @@ class PropertyModel {
         orElse: () => PropertyType.flat,
       ),
       ownerId: data['ownerId'] ?? '',
+      maintenanceContacts: (data['maintenanceContacts'] as List? ?? [])
+          .map((item) => MaintenanceContact.fromMap(Map<String, dynamic>.from(item)))
+          .toList(),
     );
   }
 
@@ -45,6 +78,7 @@ class PropertyModel {
       'imageUrl': imageUrl,
       'type': type.toString(),
       'ownerId': ownerId,
+      'maintenanceContacts': maintenanceContacts.map((c) => c.toMap()).toList(),
     };
   }
 
@@ -56,6 +90,7 @@ class PropertyModel {
     String? imageUrl,
     PropertyType? type,
     String? ownerId,
+    List<MaintenanceContact>? maintenanceContacts,
   }) {
     return PropertyModel(
       id: id ?? this.id,
@@ -65,6 +100,7 @@ class PropertyModel {
       imageUrl: imageUrl ?? this.imageUrl,
       type: type ?? this.type,
       ownerId: ownerId ?? this.ownerId,
+      maintenanceContacts: maintenanceContacts ?? this.maintenanceContacts,
     );
   }
 }

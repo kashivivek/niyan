@@ -15,9 +15,13 @@ import 'package:intl/intl.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:myapp/models/action_item_model.dart';
 import 'package:myapp/models/rent_status.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  String get currentOwnerId => FirebaseAuth.instance.currentUser?.uid ?? '';
+
 
   // Users
   Future<void> setUser(String uid, Map<String, dynamic> data) {
@@ -37,6 +41,14 @@ class DatabaseService {
         .snapshots()
         .map((snapshot) =>
             snapshot.docs.map((doc) => PropertyModel.fromFirestore(doc)).toList());
+  }
+
+  Stream<PropertyModel> getPropertyStream(String propertyId) {
+    return _db
+        .collection('properties')
+        .doc(propertyId)
+        .snapshots()
+        .map((doc) => PropertyModel.fromFirestore(doc));
   }
 
   Future<void> addProperty(PropertyModel property) {
@@ -148,6 +160,26 @@ class DatabaseService {
   }
 
   // Tenants
+  Stream<List<RentRecordModel>> getRentRecordsForTenant(String tenantId) {
+    return _db
+        .collection('rentRecords')
+        .where('tenantId', isEqualTo: tenantId)
+        .snapshots()
+        .map((snap) => snap.docs.map((doc) => RentRecordModel.fromFirestore(doc)).toList());
+  }
+
+  Stream<List<RentRecordModel>> getAllRentRecords(String ownerId) {
+    return _db
+        .collection('rentRecords')
+        .where('ownerId', isEqualTo: ownerId)
+        .snapshots()
+        .map((snap) => snap.docs.map((doc) => RentRecordModel.fromFirestore(doc)).toList());
+  }
+
+  Future<void> updateRentRecord(RentRecordModel record) {
+    return _db.collection('rentRecords').doc(record.id).update(record.toFirestore());
+  }
+
   Stream<List<TenantModel>> getTenants(String ownerId) {
     return _db
         .collection('tenants')
@@ -191,6 +223,32 @@ class DatabaseService {
 
   Future<void> updateTenantPhotoUrl(String tenantId, String photoUrl) {
     return _db.collection('tenants').doc(tenantId).update({'photoUrl': photoUrl});
+  }
+
+  Stream<TenantModel> getTenantStream(String tenantId) {
+    return _db
+        .collection('tenants')
+        .doc(tenantId)
+        .snapshots()
+        .map((doc) => TenantModel.fromFirestore(doc));
+  }
+
+  Future<TenantModel?> getTenantFuture(String tenantId) async {
+    final doc = await _db.collection('tenants').doc(tenantId).get();
+    if (!doc.exists) return null;
+    return TenantModel.fromFirestore(doc);
+  }
+
+  Stream<List<TenancyHistoryModel>> getTenancyHistory(String propertyId, String unitId) {
+    return _db
+        .collection('properties')
+        .doc(propertyId)
+        .collection('units')
+        .doc(unitId)
+        .collection('tenancyHistory')
+        .orderBy('startDate', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs.map((doc) => TenancyHistoryModel.fromFirestore(doc)).toList());
   }
 
   Future<void> updateTenant(TenantModel tenant) {
@@ -295,8 +353,9 @@ class DatabaseService {
       for (final monthDate in monthsToCheck) {
         final monthStr = DateFormat('yyyy-MM').format(monthDate);
         
-        // Skip if move-in date is after this month
-        if (tenant.moveInDate.isAfter(DateTime(monthDate.year, monthDate.month, DateUtils.getDaysInMonth(monthDate.year, monthDate.month)))) continue;
+        // Skip if month is before move-in month
+        final moveInMonth = DateTime(tenant.moveInDate.year, tenant.moveInDate.month, 1);
+        if (monthDate.isBefore(moveInMonth)) continue;
 
         final daysInMonth = DateUtils.getDaysInMonth(monthDate.year, monthDate.month);
         final dueDay = unit.rentDueDate;
@@ -306,7 +365,7 @@ class DatabaseService {
         // Logic: 7 days before due date, we ensure the record exists
         if (today.add(const Duration(days: 7)).isAfter(dueDate) || today.isAfter(dueDate)) {
           final query = await _db
-              .collection('rent_records')
+              .collection('rentRecords')
               .where('unitId', isEqualTo: unit.id)
               .where('tenantId', isEqualTo: tenant.id)
               .where('month', isEqualTo: monthStr)
@@ -316,7 +375,7 @@ class DatabaseService {
 
           if (query.docs.isEmpty) {
             developer.log('Creating rent record for ${tenant.name} - $monthStr');
-            final ref = _db.collection('rent_records').doc();
+            final ref = _db.collection('rentRecords').doc();
             final record = RentRecordModel(
               id: ref.id,
               tenantId: tenant.id,
@@ -345,7 +404,7 @@ class DatabaseService {
   // Action Center Items (Source of Truth: rent_records)
   Stream<List<ActionItem>> getActionItems(String ownerId) {
     return CombineLatestStream.combine4(
-      _db.collection('rent_records').where('ownerId', isEqualTo: ownerId).snapshots(),
+      _db.collection('rentRecords').where('ownerId', isEqualTo: ownerId).snapshots(),
       getAllTenants(ownerId),
       getProperties(ownerId),
       allUnits(ownerId),
@@ -409,7 +468,7 @@ class DatabaseService {
     final batch = _db.batch();
 
     // 1. Update Rent Record to Paid
-    final recordRef = _db.collection('rent_records').doc(item.rentRecordId);
+    final recordRef = _db.collection('rentRecords').doc(item.rentRecordId);
     batch.update(recordRef, {
       'status': 'paid',
       'paymentDate': Timestamp.now(),
@@ -438,6 +497,7 @@ class DatabaseService {
     required String unitId,
     required String tenantId,
     required String propertyId,
+    required String ownerId,
   }) async {
     final batch = _db.batch();
 
@@ -469,6 +529,9 @@ class DatabaseService {
     batch.update(tenantRef, {'isAssignedToUnit': true});
 
     await batch.commit();
+
+    // Trigger rent record sync for the owner
+    await ensureRentRecordsExist(ownerId);
   }
 
   Future<void> unassignTenantFromUnit({
@@ -486,9 +549,24 @@ class DatabaseService {
     if (unitData != null && unitData['currentTenantId'] == tenantId) {
       final tenancyHistoryId = unitData['currentTenancyHistoryId'];
 
+      // 1. Fetch Tenant and Pending Dues
+      final tenantDoc = await _db.collection('tenants').doc(tenantId).get();
+      final tenant = TenantModel.fromFirestore(tenantDoc);
+      final tenantRef = _db.collection('tenants').doc(tenantId);
+
+      final pendingRecordsSnap = await _db.collection('rentRecords')
+          .where('tenantId', isEqualTo: tenantId)
+          .where('status', isEqualTo: RentStatus.pending.toString())
+          .get();
+      final pendingRecords = pendingRecordsSnap.docs.map((doc) => RentRecordModel.fromFirestore(doc)).toList();
+      
+      double totalPending = pendingRecords.fold(0, (sum, r) => sum + r.amount);
+      double securityDeposit = tenant.securityDeposit;
+      double settlementAmount = securityDeposit - totalPending;
+
+      // 2. Process Settlement in Batch
       if (tenancyHistoryId != null) {
-        final tenancyHistoryRef =
-            unitRef.collection('tenancyHistory').doc(tenancyHistoryId);
+        final tenancyHistoryRef = unitRef.collection('tenancyHistory').doc(tenancyHistoryId);
         batch.update(tenancyHistoryRef, {'endDate': DateTime.now()});
       }
 
@@ -496,10 +574,37 @@ class DatabaseService {
         'currentTenantId': null,
         'currentTenancyHistoryId': null,
         'status': 'vacant',
+        'lastVacatedDate': Timestamp.now(),
       });
 
-      final tenantRef = _db.collection('tenants').doc(tenantId);
-      batch.update(tenantRef, {'isAssignedToUnit': false});
+      batch.update(tenantRef, {
+        'isAssignedToUnit': false,
+        'assignedUnitId': '',
+        'propertyId': '',
+        'status': TenantStatus.past.toString(),
+      });
+
+      // 3. Mark pending as paid via deposit if possible
+      for (var doc in pendingRecordsSnap.docs) {
+        batch.update(doc.reference, {'status': RentStatus.paid.toString(), 'notes': 'Paid via Security Deposit'});
+      }
+
+      // 4. Create settlement record
+      final settlementRef = _db.collection('rentRecords').doc();
+      final settlementRecord = RentRecordModel(
+        id: settlementRef.id,
+        tenantId: tenantId,
+        propertyId: propertyId,
+        unitId: unitId,
+        ownerId: tenant.ownerId,
+        amount: settlementAmount,
+        month: DateFormat('yyyy-MM').format(DateTime.now()),
+        status: settlementAmount >= 0 ? RentStatus.paid : RentStatus.pending,
+        dueDate: DateTime.now(),
+        title: 'Security Deposit Settlement',
+        notes: 'Deposit: $securityDeposit, Dues: $totalPending',
+      );
+      batch.set(settlementRef, settlementRecord.toFirestore());
 
       await batch.commit();
     }
@@ -547,7 +652,7 @@ class DatabaseService {
       for (final uid in unitIds) {
         final unit = unitMap[uid];
         if (unit != null && unit.currentTenantId != null) {
-          final recordRef = _db.collection('rent_records').doc();
+          final recordRef = _db.collection('rentRecords').doc();
           final record = RentRecordModel(
             id: recordRef.id,
             tenantId: unit.currentTenantId!,
@@ -566,5 +671,56 @@ class DatabaseService {
     }
 
     await batch.commit();
+  }
+
+  Stream<List<RentRecordModel>> getRecentRentRecords(String ownerId) {
+    return _db.collection('rentRecords')
+        .where('ownerId', isEqualTo: ownerId)
+        .orderBy('dueDate', descending: true)
+        .limit(20)
+        .snapshots()
+        .map((snap) => snap.docs.map((doc) => RentRecordModel.fromFirestore(doc)).toList());
+  }
+
+  Future<void> recordTransaction({
+
+    required String propertyId,
+    required String unitId,
+    required String tenantId,
+    required double amount,
+    required String description,
+    required String type,
+    required String month,
+  }) async {
+    final ref = _db.collection('transactions').doc();
+    final transaction = TransactionModel(
+      id: ref.id,
+      unitId: unitId,
+      propertyId: propertyId,
+      ownerId: currentOwnerId,
+      tenantId: tenantId,
+      description: description,
+      amount: amount,
+      date: DateTime.now(),
+      type: type == 'income' ? TransactionType.income : TransactionType.expense,
+      month: month,
+    );
+    await ref.set(transaction.toFirestore());
+  }
+
+  Stream<List<MaintenanceContact>> getNearbyMaintenanceContacts(String city, String excludePropertyId) {
+
+    return _db.collection('properties')
+        .where('city', isEqualTo: city)
+        .snapshots()
+        .map((snap) {
+          List<MaintenanceContact> nearby = [];
+          for (var doc in snap.docs) {
+            if (doc.id == excludePropertyId) continue;
+            final prop = PropertyModel.fromFirestore(doc);
+            nearby.addAll(prop.maintenanceContacts);
+          }
+          return nearby;
+        });
   }
 }
