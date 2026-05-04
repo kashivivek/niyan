@@ -1,173 +1,447 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:myapp/models/unit_model.dart';
 import 'package:myapp/models/property_model.dart';
-import 'package:myapp/services/auth_service.dart';
+import 'package:myapp/models/tenant_model.dart';
 import 'package:myapp/services/database_service.dart';
-import 'package:myapp/screens/property_detail_screen.dart';
-import 'package:myapp/screens/add_property_screen.dart';
 import 'package:myapp/providers/theme_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:rxdart/rxdart.dart';
 
-class PropertyListScreen extends StatelessWidget {
+class PropertyListScreen extends StatefulWidget {
   const PropertyListScreen({super.key});
 
   @override
+  State<PropertyListScreen> createState() => _PropertyListScreenState();
+}
+
+class _PropertyListScreenState extends State<PropertyListScreen> {
+  bool _showAllUnits = false; // Default back to false
+  String? _searchQuery;
+
+  final Set<String> _selectedPropertyIds = {};
+  final Set<String> _selectedStatusTypes = {}; // 'occupied', 'vacant'
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final uri = GoRouterState.of(context).uri;
+    if (uri.queryParameters['filter'] == 'vacant') {
+      _showAllUnits = true;
+      _selectedStatusTypes.add('vacant');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context);
-    final databaseService = Provider.of<DatabaseService>(context);
-    final user = authService.user;
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final ownerId = databaseService.currentOwnerId;
 
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        leadingWidth: 160,
-        leading: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-          child: Image.asset('assets/images/logo_full.png', fit: BoxFit.contain),
+        title: Text(
+          _showAllUnits ? 'Portfolio Inventory' : 'My Properties',
+          style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy),
         ),
-        title: const SizedBox.shrink(),
-      ),
-      body: StreamBuilder<List<PropertyModel>>(
-        stream: user.asyncExpand((user) => user != null ? databaseService.getProperties(user.uid) : Stream.value([])),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(32.0),
-                child: Text(
-                  'No properties found. Tap + to add one.',
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16),
+            child: Row(
+              children: [
+                Text('All Units', style: TextStyle(color: _showAllUnits ? ThemeProvider.accentBlue : Colors.grey, fontWeight: FontWeight.w600)),
+                Switch(
+                  value: _showAllUnits,
+                  activeColor: ThemeProvider.accentBlue,
+                  onChanged: (val) => setState(() => _showAllUnits = val),
                 ),
-              ),
-            );
-          }
-
-          final properties = snapshot.data!;
-          final screenWidth = MediaQuery.of(context).size.width;
-          final crossAxisCount = screenWidth > 1200 ? 3 : (screenWidth > 800 ? 2 : 1);
-
-          return GridView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100), // Padding for bottom nav
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 24,
-              mainAxisSpacing: 24,
-              childAspectRatio: 1.1, // Fixed ratio to prevent huge stretched images 
+              ],
             ),
-            itemCount: properties.length,
-            itemBuilder: (context, index) {
-              final property = properties[index];
-              return _buildPropertyCard(context, property);
-            },
-          );
-        },
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
+      body: Column(
+        children: [
+          _buildSearchField(),
+          if (_showAllUnits) _buildAllUnitsFilters(databaseService, ownerId),
+          Expanded(
+            child: _showAllUnits 
+              ? _buildAllUnitsView(databaseService, ownerId)
+              : _buildPropertiesView(databaseService, ownerId),
+          ),
+        ],
+      ),
+      floatingActionButton: _showAllUnits ? null : FloatingActionButton(
         backgroundColor: ThemeProvider.accentBlue,
+        onPressed: () => context.push('/properties/add'),
         child: const Icon(Icons.add, color: Colors.white),
-        onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const AddPropertyScreen()));
-        },
       ),
     );
   }
 
-  Widget _buildPropertyCard(BuildContext context, PropertyModel property) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => PropertyDetailScreen(property: property)));
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
+  Widget _buildSearchField() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Colors.white,
+      child: TextField(
+        decoration: InputDecoration(
+          hintText: _showAllUnits ? 'Search units...' : 'Search properties...',
+          prefixIcon: const Icon(Icons.search),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+          filled: true,
+          fillColor: Colors.grey.shade50,
         ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Image Header
-            Stack(
-              children: [
-                Hero(
-                  tag: 'property_${property.id}',
-                  child: property.imageUrl != null && property.imageUrl!.isNotEmpty
-                      ? Image.network(
-                          property.imageUrl!,
-                          height: 200,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        )
-                      : Image.network(
-                          'https://maps.googleapis.com/maps/api/staticmap?center=${Uri.encodeComponent('${property.address}, ${property.city}')}&zoom=15&size=600x300&maptype=roadmap&markers=color:red%7C${Uri.encodeComponent('${property.address}, ${property.city}')}&key=AIzaSyDecNKEtkvBJ5tojkOlWVI4CvaLRQMTFKo',
-                          height: 200,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              height: 200,
-                              width: double.infinity,
-                              color: Colors.grey.shade100,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.map_outlined, size: 48, color: Colors.grey.shade400),
-                                  const SizedBox(height: 8),
-                                  Text('Add Maps API Key in code to view', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
+        onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
+      ),
+    );
+  }
+
+  Widget _buildAllUnitsFilters(DatabaseService db, String ownerId) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Row(
+        children: [
+          _buildFilterButton(
+            label: 'Properties',
+            count: _selectedPropertyIds.length,
+            onTap: () => _showMultiSelectDialog(
+              title: 'Filter Properties',
+              stream: db.getProperties(ownerId),
+              selectedIds: _selectedPropertyIds,
+              idMapper: (PropertyModel p) => p.id,
+              labelMapper: (PropertyModel p) => p.name,
+              onChanged: (ids) => setState(() {
+                _selectedPropertyIds.clear();
+                _selectedPropertyIds.addAll(ids);
+              }),
+            ),
+          ),
+          const SizedBox(width: 8),
+          _buildFilterButton(
+            label: 'Status',
+            count: _selectedStatusTypes.length,
+            onTap: () => _showStatusFilterDialog(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterButton({required String label, required int count, required VoidCallback onTap}) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          decoration: BoxDecoration(
+            color: count > 0 ? ThemeProvider.accentBlue.withOpacity(0.05) : Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: count > 0 ? ThemeProvider.accentBlue : Colors.grey.shade200),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                count > 0 ? '$label ($count)' : label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: count > 0 ? FontWeight.bold : FontWeight.normal,
+                  color: count > 0 ? ThemeProvider.accentBlue : Colors.grey.shade600,
                 ),
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      property.type.name.toUpperCase(),
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, letterSpacing: 0.5),
-                    ),
-                  ),
+              ),
+              Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: count > 0 ? ThemeProvider.accentBlue : Colors.grey),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showMultiSelectDialog<T>({
+    required String title,
+    required Stream<List<T>> stream,
+    required Set<String> selectedIds,
+    required String Function(T) idMapper,
+    required String Function(T) labelMapper,
+    required Function(Set<String>) onChanged,
+  }) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        Set<String> tempSelected = Set.from(selectedIds);
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(title),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: StreamBuilder<List<T>>(
+                  stream: stream,
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                    final items = snapshot.data!;
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        final id = idMapper(item);
+                        return CheckboxListTile(
+                          value: tempSelected.contains(id),
+                          title: Text(labelMapper(item)),
+                          onChanged: (val) {
+                            setDialogState(() {
+                              if (val == true) tempSelected.add(id);
+                              else tempSelected.remove(id);
+                            });
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: () {
+                    onChanged(tempSelected);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Apply'),
                 ),
               ],
-            ),
-            // Details Area
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showStatusFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        Set<String> tempSelected = Set.from(_selectedStatusTypes);
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Filter Status'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CheckboxListTile(
+                    value: tempSelected.contains('occupied'),
+                    title: const Text('Occupied'),
+                    onChanged: (val) => setDialogState(() => val == true ? tempSelected.add('occupied') : tempSelected.remove('occupied')),
+                  ),
+                  CheckboxListTile(
+                    value: tempSelected.contains('vacant'),
+                    title: const Text('Vacant'),
+                    onChanged: (val) => setDialogState(() => val == true ? tempSelected.add('vacant') : tempSelected.remove('vacant')),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedStatusTypes.clear();
+                      _selectedStatusTypes.addAll(tempSelected);
+                    });
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPropertiesView(DatabaseService databaseService, String ownerId) {
+    return StreamBuilder<List<PropertyModel>>(
+      stream: databaseService.getProperties(ownerId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        var properties = snapshot.data!;
+        if (_searchQuery != null && _searchQuery!.isNotEmpty) {
+          properties = properties.where((p) => p.name.toLowerCase().contains(_searchQuery!) || p.address.toLowerCase().contains(_searchQuery!)).toList();
+        }
+
+        if (properties.isEmpty) return _buildEmptyState('No properties found');
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: properties.length,
+          itemBuilder: (context, index) => _PropertyCard(property: properties[index]),
+        );
+      },
+    );
+  }
+
+  Widget _buildAllUnitsView(DatabaseService databaseService, String ownerId) {
+    final unitsStream = databaseService.allUnits(ownerId);
+    final propertiesStream = databaseService.getProperties(ownerId);
+    final tenantsStream = databaseService.getTenants(ownerId);
+
+    return StreamBuilder<List<dynamic>>(
+      stream: CombineLatestStream.list([unitsStream, propertiesStream, tenantsStream]),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final units = snapshot.data![0] as List<UnitModel>;
+        final properties = snapshot.data![1] as List<PropertyModel>;
+        final tenants = snapshot.data![2] as List<TenantModel>;
+
+        final propMap = {for (var p in properties) p.id: p};
+        final tenantMap = {for (var t in tenants) t.id: t};
+
+        var filteredUnits = units;
+
+        // Filter by property
+        if (_selectedPropertyIds.isNotEmpty) {
+          filteredUnits = filteredUnits.where((u) => _selectedPropertyIds.contains(u.propertyId)).toList();
+        }
+
+        // Filter by status
+        if (_selectedStatusTypes.isNotEmpty) {
+          filteredUnits = filteredUnits.where((u) => _selectedStatusTypes.contains(u.isOccupied ? 'occupied' : 'vacant')).toList();
+        }
+
+        // Search
+        if (_searchQuery != null && _searchQuery!.isNotEmpty) {
+          filteredUnits = filteredUnits.where((u) {
+            final pName = propMap[u.propertyId]?.name.toLowerCase() ?? '';
+            return u.unitNumber.toLowerCase().contains(_searchQuery!) || pName.contains(_searchQuery!);
+          }).toList();
+        }
+
+        if (filteredUnits.isEmpty) return _buildEmptyState('No units found');
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: filteredUnits.length,
+          itemBuilder: (context, index) {
+            final unit = filteredUnits[index];
+            final property = propMap[unit.propertyId];
+            final tenant = unit.currentTenantId != null ? tenantMap[unit.currentTenantId] : null;
+
+            String subtitle = 'Vacant';
+            if (unit.isOccupied) {
+              subtitle = 'Occupied by ${tenant?.name ?? 'Unknown'}';
+            } else if (unit.lastVacatedDate != null) {
+              subtitle = 'Vacant since ${DateFormat('MMM dd, yyyy').format(unit.lastVacatedDate!)}';
+            }
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade200)),
+              child: ListTile(
+                onTap: () => context.push('/property/${unit.propertyId}/unit/${unit.id}', extra: unit),
+                leading: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(color: (unit.isOccupied ? ThemeProvider.accentBlue : Colors.teal).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                  child: Icon(unit.isOccupied ? Icons.person_outline : Icons.door_front_door_outlined, color: unit.isOccupied ? ThemeProvider.accentBlue : Colors.teal),
+                ),
+                title: Text('${unit.unitNumber} - ${property?.name ?? 'Property'}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(subtitle),
+                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(message, style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
+        ],
+      ),
+    );
+  }
+}
+
+class _PropertyCard extends StatelessWidget {
+  final PropertyModel property;
+  const _PropertyCard({required this.property});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: InkWell(
+        onTap: () => context.push('/property/${property.id}', extra: property),
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (property.imageUrl != null && property.imageUrl!.isNotEmpty)
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Image.network(property.imageUrl!, height: 160, width: double.infinity, fit: BoxFit.cover),
+              )
+            else
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Image.network(
+                  'https://maps.googleapis.com/maps/api/staticmap?center=${Uri.encodeComponent('${property.address},${property.city}')}&zoom=15&size=800x400&maptype=roadmap&markers=color:red%7Clabel:P%7C${Uri.encodeComponent('${property.address},${property.city}')}&key=AIzaSyDecNKEtkvBJ5tojkOlWVI4CvaLRQMTFKo',
+                  height: 160,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 160,
+                    width: double.infinity,
+                    color: ThemeProvider.primaryNavy.withOpacity(0.05),
+                    child: Icon(Icons.apartment_rounded, size: 48, color: ThemeProvider.primaryNavy.withOpacity(0.2)),
+                  ),
+                ),
+              ),
+
             Padding(
-              padding: const EdgeInsets.all(20.0),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    property.name,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 22),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: Text(property.name, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy))),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: ThemeProvider.accentBlue.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                        child: Text(property.type.name.toUpperCase(), style: TextStyle(color: ThemeProvider.accentBlue, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.location_on_outlined, size: 18, color: Colors.grey.shade500),
+                      Icon(Icons.location_on_outlined, size: 14, color: Colors.grey.shade500),
                       const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          '${property.address}, ${property.city}',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
+                      Text(property.address, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
                     ],
                   ),
                 ],

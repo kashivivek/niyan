@@ -17,6 +17,7 @@ class TenantModel {
   final String assignedUnitId;
   final bool isAssignedToUnit;
   final String? photoUrl;
+  final double securityDeposit; // #7: Captured once per tenant
 
   TenantModel({
     required this.id,
@@ -24,7 +25,7 @@ class TenantModel {
     this.phoneNumber,
     this.alternatePhone,
     this.email,
-    this.rentAmount = 0.0, // #7 - no longer required
+    this.rentAmount = 0.0,
     required this.dueDate,
     required this.moveInDate,
     this.status = TenantStatus.active,
@@ -33,6 +34,7 @@ class TenantModel {
     required this.assignedUnitId,
     this.isAssignedToUnit = false,
     this.photoUrl,
+    this.securityDeposit = 0.0,
   });
 
   factory TenantModel.fromFirestore(DocumentSnapshot doc) {
@@ -55,6 +57,7 @@ class TenantModel {
       assignedUnitId: data['assignedUnitId'] ?? '',
       isAssignedToUnit: data['isAssignedToUnit'] ?? false,
       photoUrl: data['photoUrl'] as String?,
+      securityDeposit: (data['securityDeposit'] ?? 0).toDouble(),
     );
   }
 
@@ -73,6 +76,7 @@ class TenantModel {
       'assignedUnitId': assignedUnitId,
       'isAssignedToUnit': isAssignedToUnit,
       'photoUrl': photoUrl,
+      'securityDeposit': securityDeposit,
     };
   }
 
@@ -91,6 +95,7 @@ class TenantModel {
     String? assignedUnitId,
     bool? isAssignedToUnit,
     String? photoUrl,
+    double? securityDeposit,
   }) {
     return TenantModel(
       id: id ?? this.id,
@@ -107,6 +112,7 @@ class TenantModel {
       assignedUnitId: assignedUnitId ?? this.assignedUnitId,
       isAssignedToUnit: isAssignedToUnit ?? this.isAssignedToUnit,
       photoUrl: photoUrl ?? this.photoUrl,
+      securityDeposit: securityDeposit ?? this.securityDeposit,
     );
   }
 }

@@ -7,9 +7,14 @@ import 'package:myapp/models/user_model.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  bool _initialized = false;
+  bool get initialized => _initialized;
+
+  User? get currentUser => _auth.currentUser;
 
   Stream<UserModel?> get user {
-    return _auth.authStateChanges().switchMap((User? firebaseUser) {
+    return _auth.authStateChanges().doOnData((_) => _initialized = true).switchMap((User? firebaseUser) {
+
       if (firebaseUser != null) {
         return _db
             .collection('users')

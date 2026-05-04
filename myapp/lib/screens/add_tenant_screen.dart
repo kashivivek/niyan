@@ -1,5 +1,3 @@
-
-import 'dart:io';
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -10,6 +8,8 @@ import 'package:myapp/services/database_service.dart';
 import 'package:myapp/services/image_service.dart';
 import 'package:intl/intl.dart';
 import 'package:myapp/widgets/responsive_centered.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:io' as io;
 
 class AddTenantScreen extends StatefulWidget {
   const AddTenantScreen({super.key});
@@ -22,16 +22,17 @@ class AddTenantScreenState extends State<AddTenantScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _altPhoneController = TextEditingController(); // #6
+  final _altPhoneController = TextEditingController();
+  final _depositController = TextEditingController(text: '0.0');
   DateTime? _moveInDate;
-  File? _image;
+  XFile? _image;
   final ImagePicker _picker = ImagePicker();
 
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
-        _image = File(pickedFile.path);
+        _image = pickedFile;
       });
     }
   }
@@ -73,12 +74,13 @@ class AddTenantScreenState extends State<AddTenantScreen> {
         phoneNumber: _phoneController.text.isNotEmpty ? _phoneController.text : null,
         alternatePhone: _altPhoneController.text.isNotEmpty ? _altPhoneController.text : null,
         rentAmount: 0.0,
-        dueDate: DateTime.now(), // placeholder; due date is now per unit
+        dueDate: DateTime.now(), 
         moveInDate: _moveInDate!,
         ownerId: user.uid,
         isAssignedToUnit: false,
         propertyId: '',
         assignedUnitId: '',
+        securityDeposit: double.tryParse(_depositController.text) ?? 0.0,
       );
 
       try {
@@ -88,8 +90,7 @@ class AddTenantScreenState extends State<AddTenantScreen> {
         final tenantRef = await databaseService.addTenant(newTenant);
 
         if (_image != null) {
-          final imageUrl =
-              await imageService.uploadTenantPhoto(tenantRef.id, _image!);
+          final imageUrl = await imageService.uploadTenantPhoto(tenantRef.id, _image);
           if (imageUrl != null) {
             await databaseService.updateTenantPhotoUrl(tenantRef.id, imageUrl);
           }
@@ -101,19 +102,25 @@ class AddTenantScreenState extends State<AddTenantScreen> {
             const SnackBar(content: Text('Tenant added successfully!')),
           );
         }
-      } catch (e, s) {
-        developer.log(
-          'Failed to add tenant',
-          name: 'add_tenant.error',
-          error: e,
-          stackTrace: s,
-        );
+      } catch (e) {
+        developer.log('Error adding tenant: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to add tenant: ${e.toString()}')),
+            SnackBar(content: Text('Error adding tenant: $e')),
           );
         }
       }
+    }
+  }
+
+  Widget _buildImagePreview() {
+    if (_image == null) {
+      return const Icon(Icons.add_a_photo, size: 50, color: Colors.grey);
+    }
+    if (kIsWeb) {
+      return Image.network(_image!.path, fit: BoxFit.cover);
+    } else {
+      return Image.file(io.File(_image!.path), fit: BoxFit.cover);
     }
   }
 
@@ -124,103 +131,67 @@ class AddTenantScreenState extends State<AddTenantScreen> {
         title: const Text('Add New Tenant'),
       ),
       body: ResponsiveCentered(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Center(
-                child: GestureDetector(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                GestureDetector(
                   onTap: _pickImage,
-                  child: CircleAvatar(
-                    radius: 60,
-                    backgroundColor: Colors.grey[200],
-                    backgroundImage: _image != null ? FileImage(_image!) : null,
-                    child: _image == null
-                        ? Icon(Icons.camera_alt,
-                            color: Colors.grey[800], size: 40)
-                        : null,
+                  child: Container(
+                    height: 150,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: _buildImagePreview(),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Full Name',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                  validator: (value) =>
+                      value == null || value.isEmpty ? 'Please enter a name' : null,
                 ),
-                validator: (value) =>
-                    value!.isEmpty ? 'Please enter a name' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Phone Number',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _phoneController,
+                  decoration: const InputDecoration(labelText: 'Phone Number'),
+                  keyboardType: TextInputType.phone,
                 ),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
-              // #6: Alternate phone number field
-              TextFormField(
-                controller: _altPhoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Alternate Phone Number (Optional)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone_forwarded_outlined),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _altPhoneController,
+                  decoration: const InputDecoration(labelText: 'Alternate Phone Number'),
+                  keyboardType: TextInputType.phone,
                 ),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
-              // #7: Rent Amount field removed — rent is managed at unit level
-              _buildDatePicker(
-                context: context,
-                label: 'Move-in Date',
-                date: _moveInDate,
-                onPressed: () => _selectDate(context),
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: _submitForm,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _depositController,
+                  decoration: const InputDecoration(labelText: 'Security Deposit'),
+                  keyboardType: TextInputType.number,
+                  validator: (value) =>
+                      value == null || value.isEmpty ? 'Please enter a deposit amount' : null,
                 ),
-                child: const Text('Add Tenant', style: TextStyle(fontSize: 16)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDatePicker({
-    required BuildContext context,
-    required String label,
-    required DateTime? date,
-    required VoidCallback onPressed,
-  }) {
-    return InkWell(
-      onTap: onPressed,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-          prefixIcon: const Icon(Icons.calendar_today),
-        ),
-        child: Text(
-          date != null ? DateFormat.yMMMd().format(date) : 'Select a date',
-          style: TextStyle(
-            color: date != null
-                ? Theme.of(context).textTheme.bodyLarge?.color
-                : Theme.of(context).hintColor,
+                const SizedBox(height: 16),
+                ListTile(
+                  title: const Text('Move-In Date'),
+                  subtitle: Text(_moveInDate == null
+                      ? 'Not selected'
+                      : DateFormat('MMM dd, yyyy').format(_moveInDate!)),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () => _selectDate(context),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: _submitForm,
+                  child: const Text('Add Tenant'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

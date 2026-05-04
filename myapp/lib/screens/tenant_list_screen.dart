@@ -6,6 +6,7 @@ import 'package:myapp/screens/add_tenant_screen.dart';
 import 'package:myapp/screens/tenant_detail_screen.dart';
 import 'package:myapp/models/user_model.dart';
 import 'package:myapp/providers/theme_provider.dart';
+import 'package:go_router/go_router.dart';
 
 class TenantListScreen extends StatelessWidget {
   const TenantListScreen({super.key});
@@ -61,7 +62,7 @@ class TenantListScreen extends StatelessWidget {
       floatingActionButton: FloatingActionButton(
         backgroundColor: ThemeProvider.accentBlue,
         child: const Icon(Icons.person_add_rounded, color: Colors.white),
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddTenantScreen())),
+        onPressed: () => context.push('/tenants/add'),
       ),
     );
   }
@@ -116,7 +117,7 @@ class TenantCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TenantDetailScreen(tenant: tenant))),
+          onTap: () => context.push('/tenant/${tenant.id}', extra: tenant),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(

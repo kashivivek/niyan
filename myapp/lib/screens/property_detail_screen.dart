@@ -9,161 +9,308 @@ import 'package:myapp/models/user_model.dart';
 import 'package:myapp/services/database_service.dart';
 import 'package:myapp/providers/theme_provider.dart';
 import 'package:myapp/utils/currency_helper.dart';
-import './add_unit_screen.dart';
-import './edit_property_screen.dart';
-import './unit_detail_screen.dart';
+import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PropertyDetailScreen extends StatelessWidget {
-  final PropertyModel property;
+  final PropertyModel? property;
+  final String propertyId;
 
-  const PropertyDetailScreen({super.key, required this.property});
+  const PropertyDetailScreen({super.key, this.property, required this.propertyId});
 
   @override
   Widget build(BuildContext context) {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     final user = Provider.of<UserModel?>(context);
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 250.0,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                property.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  shadows: [Shadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 2))],
-                ),
-              ),
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Hero(
-                    tag: 'property_${property.id}',
-                    child: property.imageUrl != null && property.imageUrl!.isNotEmpty
-                        ? Image.network(property.imageUrl!, fit: BoxFit.cover)
-                        : Image.network(
-                            'https://maps.googleapis.com/maps/api/staticmap?center=${Uri.encodeComponent('${property.address}, ${property.city}')}&zoom=15&size=800x400&maptype=roadmap&markers=color:red%7C${Uri.encodeComponent('${property.address}, ${property.city}')}&key=AIzaSyDecNKEtkvBJ5tojkOlWVI4CvaLRQMTFKo',
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: ThemeProvider.primaryNavy,
-                                child: const Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.map_outlined, size: 64, color: Colors.white54),
-                                    SizedBox(height: 8),
-                                    Text('Add Maps API Key in code to view', style: TextStyle(color: Colors.white54, fontSize: 14)),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black87],
-                      ),
+    return StreamBuilder<PropertyModel>(
+      stream: databaseService.getPropertyStream(propertyId),
+      initialData: property,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        final currentProperty = snapshot.data!;
+
+        return Scaffold(
+          body: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                expandedHeight: 250.0,
+                pinned: true,
+                flexibleSpace: FlexibleSpaceBar(
+                  title: Text(
+                    currentProperty.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      shadows: [Shadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 2))],
                     ),
                   ),
-                ],
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.edit_outlined),
-                tooltip: 'Edit Property',
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => EditPropertyScreen(property: property))),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, color: Colors.white),
-                tooltip: 'Delete Property',
-                onPressed: () => _confirmDelete(context, databaseService),
-              ),
-            ],
-            iconTheme: const IconThemeData(color: Colors.white),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                  background: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Icon(Icons.location_on_outlined, color: Colors.grey.shade500),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${property.address}, ${property.city}',
-                          style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
+                      Hero(
+                        tag: 'property_${currentProperty.id}',
+                        child: currentProperty.imageUrl != null && currentProperty.imageUrl!.isNotEmpty
+                            ? Image.network(currentProperty.imageUrl!, fit: BoxFit.cover)
+                            : Image.network(
+                                'https://maps.googleapis.com/maps/api/staticmap?center=${Uri.encodeComponent('${currentProperty.address},${currentProperty.city}')}&zoom=15&size=800x400&maptype=roadmap&markers=color:red%7Clabel:P%7C${Uri.encodeComponent('${currentProperty.address},${currentProperty.city}')}&key=AIzaSyDecNKEtkvBJ5tojkOlWVI4CvaLRQMTFKo',
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: ThemeProvider.primaryNavy,
+                                    child: const Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.map_outlined, size: 64, color: Colors.white54),
+                                        SizedBox(height: 8),
+                                        Text('Add Maps API Key in code to view', style: TextStyle(color: Colors.white54, fontSize: 14)),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.7),
+                            ],
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 32),
-                  const Text('Units', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
+                ),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    onPressed: () => context.push('/properties/edit', extra: currentProperty),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.white),
+                    onPressed: () => _confirmDelete(context, databaseService, currentProperty),
+                  ),
                 ],
               ),
-            ),
+              SliverList(
+                delegate: SliverChildListDelegate([
+                  _buildInfoSection(currentProperty),
+                  _buildMaintenanceSection(context, databaseService, currentProperty),
+                  _buildActionsSection(context, databaseService, currentProperty),
+                  _buildUnitsSection(context, databaseService, currentProperty, user),
+                ]),
+              ),
+            ],
           ),
-          StreamBuilder<List<UnitModel>>(
-            stream: databaseService.getUnits(property.id),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SliverFillRemaining(child: Center(child: CircularProgressIndicator()));
-              }
-              if (snapshot.hasError) {
-                return SliverFillRemaining(child: Center(child: Text('Error: ${snapshot.error}')));
-              }
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return SliverFillRemaining(child: _buildEmptyState(context));
-              }
+          floatingActionButton: FloatingActionButton(
+            backgroundColor: ThemeProvider.accentBlue,
+            onPressed: () => context.push('/property/${currentProperty.id}/unit/add'),
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
+        );
+      },
+    );
+  }
 
-              final units = snapshot.data!;
-              return SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      return UnitCard(unit: units[index], currency: user?.currency);
-                    },
-                    childCount: units.length,
-                  ),
-                ),
-              );
-            },
+  Widget _buildInfoSection(PropertyModel property) {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(color: ThemeProvider.accentBlue.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                child: Text(property.type.name.toUpperCase(), style: TextStyle(color: ThemeProvider.accentBlue, fontWeight: FontWeight.bold, fontSize: 12)),
+              ),
+              const SizedBox(width: 8),
+              Text(property.city, style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(property.address, style: GoogleFonts.inter(fontSize: 16, color: Colors.grey.shade800)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMaintenanceSection(BuildContext context, DatabaseService databaseService, PropertyModel property) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Maintenance Directory', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline, color: ThemeProvider.accentBlue),
+                onPressed: () => _showAddMaintenanceDialog(context, databaseService, property),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (property.maintenanceContacts.isEmpty)
+            _buildNearbyMaintenance(context, databaseService, property)
+          else
+            ...property.maintenanceContacts.map((contact) => _buildContactTile(contact, property, databaseService)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNearbyMaintenance(BuildContext context, DatabaseService databaseService, PropertyModel property) {
+    return StreamBuilder<List<MaintenanceContact>>(
+      stream: databaseService.getNearbyMaintenanceContacts(property.city, property.id),
+      builder: (context, snapshot) {
+        final nearby = snapshot.data ?? [];
+        if (nearby.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12)),
+            child: const Center(child: Text('No maintenance contacts stored for this property.')),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12.0),
+              child: Text('Suggested from nearby properties:', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+            ),
+            ...nearby.map((c) => _buildContactTile(c, property, databaseService, isFallback: true)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildContactTile(MaintenanceContact contact, PropertyModel property, DatabaseService databaseService, {bool isFallback = false}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade100)),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: ThemeProvider.accentBlue.withOpacity(0.1),
+          child: Icon(_getCategoryIcon(contact.category), color: ThemeProvider.accentBlue, size: 20),
+        ),
+        title: Text(contact.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(contact.category),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.call_rounded, color: Colors.green),
+              onPressed: () => launchUrl(Uri.parse('tel:${contact.phone}')),
+            ),
+            if (!isFallback)
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                onPressed: () => _removeContact(databaseService, property, contact),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _getCategoryIcon(String category) {
+    category = category.toLowerCase();
+    if (category.contains('plumb')) return Icons.plumbing_rounded;
+    if (category.contains('electr')) return Icons.electrical_services_rounded;
+    if (category.contains('clean')) return Icons.cleaning_services_rounded;
+    if (category.contains('paint')) return Icons.format_paint_rounded;
+    return Icons.build_outlined;
+  }
+
+  Future<void> _removeContact(DatabaseService db, PropertyModel property, MaintenanceContact contact) async {
+    final newList = List<MaintenanceContact>.from(property.maintenanceContacts)
+      ..removeWhere((c) => c.phone == contact.phone && c.name == contact.name);
+    await db.updateProperty(property.copyWith(maintenanceContacts: newList));
+  }
+
+  Widget _buildActionsSection(BuildContext context, DatabaseService databaseService, PropertyModel property) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ThemeProvider.primaryNavy,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => _showExpenseModal(context, databaseService, property),
+              icon: const Icon(Icons.add_card_rounded),
+              label: const Text('Add Expense'),
+            ),
           ),
         ],
       ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.end,
+    );
+  }
+
+  Widget _buildUnitsSection(BuildContext context, DatabaseService databaseService, PropertyModel property, UserModel? user) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FloatingActionButton.extended(
-            heroTag: 'add_expense_fab',
-            icon: const Icon(Icons.receipt_long_outlined, color: Colors.white),
-            backgroundColor: Colors.orange.shade700,
-            label: const Text('Add Property Expense', style: TextStyle(color: Colors.white)),
-            onPressed: () => _showAddExpenseDialog(context, databaseService),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Units', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+              TextButton.icon(
+                onPressed: () => context.push('/property/${property.id}/unit/add'),
+                icon: const Icon(Icons.add),
+                label: const Text('Add Unit'),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          FloatingActionButton.extended(
-            heroTag: 'add_unit_fab',
-            icon: const Icon(Icons.add_home_outlined, color: Colors.white),
-            backgroundColor: ThemeProvider.accentBlue,
-            label: const Text('Add Unit', style: TextStyle(color: Colors.white)),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => AddUnitScreen(propertyId: property.id, property: property)),
+          const SizedBox(height: 16),
+          StreamBuilder<List<UnitModel>>(
+            stream: databaseService.getUnits(property.id),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+              final units = snapshot.data!;
+              if (units.isEmpty) return const Center(child: Text('No units added yet.'));
+
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: units.length,
+                itemBuilder: (context, index) {
+                  final unit = units[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)),
+                    child: ListTile(
+                      onTap: () => context.push('/property/${property.id}/unit/${unit.id}', extra: unit),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      title: Text('Unit ${unit.unitNumber}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      subtitle: Text(unit.isOccupied ? 'Occupied' : 'Vacant', style: TextStyle(color: unit.isOccupied ? ThemeProvider.accentBlue : Colors.teal, fontWeight: FontWeight.w600)),
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(CurrencyHelper.format(unit.monthlyRent, user?.currency ?? 'USD'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                          const Text('per month', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -172,10 +319,52 @@ class PropertyDetailScreen extends StatelessWidget {
     );
   }
 
-  void _showAddExpenseDialog(BuildContext context, DatabaseService databaseService) async {
-    final unitsSnap = await databaseService.getUnits(property.id).first;
-    if (!context.mounted) return;
+  void _showAddMaintenanceDialog(BuildContext context, DatabaseService db, PropertyModel property) {
+    final nameController = TextEditingController();
+    final categoryController = TextEditingController();
+    final phoneController = TextEditingController();
 
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Contact'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name')),
+            TextField(controller: categoryController, decoration: const InputDecoration(labelText: 'Category (e.g. Plumber)')),
+            TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'Phone'), keyboardType: TextInputType.phone),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty || phoneController.text.isEmpty) return;
+              final contact = MaintenanceContact(
+                name: nameController.text.trim(),
+                category: categoryController.text.trim(),
+                phone: phoneController.text.trim(),
+              );
+              final newList = List<MaintenanceContact>.from(property.maintenanceContacts)..add(contact);
+              await db.updateProperty(property.copyWith(maintenanceContacts: newList));
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showExpenseModal(BuildContext context, DatabaseService databaseService, PropertyModel property) async {
+    final unitsSnap = await databaseService.getUnits(property.id).first;
+    if (context.mounted) {
+      _showExpenseSheet(context, databaseService, property, unitsSnap);
+    }
+  }
+
+  void _showExpenseSheet(BuildContext context, DatabaseService databaseService, PropertyModel property, List<UnitModel> unitsSnap) async {
     final ownerId = FirebaseAuth.instance.currentUser?.uid ?? '';
     final descController = TextEditingController();
     final amountController = TextEditingController();
@@ -211,122 +400,63 @@ class PropertyDetailScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text('Add Property Expense', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold)),
-                      Text('Split equally across selected units.', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
                       const SizedBox(height: 24),
                       TextFormField(
                         controller: descController,
-                        decoration: const InputDecoration(
-                          labelText: 'Description',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.description_outlined),
-                        ),
+                        decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder(), prefixIcon: Icon(Icons.description_outlined)),
                         validator: (v) => v == null || v.isEmpty ? 'Enter a description' : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: amountController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(
-                          labelText: 'Total Amount',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.attach_money_rounded),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'Enter an amount';
-                          if (double.tryParse(v) == null) return 'Enter a valid number';
-                          return null;
-                        },
+                        decoration: const InputDecoration(labelText: 'Total Amount', border: OutlineInputBorder(), prefixIcon: Icon(Icons.attach_money_rounded)),
+                        validator: (v) => (v == null || double.tryParse(v) == null) ? 'Enter a valid amount' : null,
                       ),
                       const SizedBox(height: 16),
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Expanded(
-                            child: DropdownButtonFormField<int>(
-                              value: selectedMonth,
-                              decoration: const InputDecoration(labelText: 'Month', border: OutlineInputBorder()),
-                              items: months.map((m) => DropdownMenuItem(value: m, child: Text(DateFormat('MMMM').format(DateTime(2022, m))))).toList(),
-                              onChanged: (v) { if (v != null) setModalState(() => selectedMonth = v); },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DropdownButtonFormField<int>(
-                              value: selectedYear,
-                              decoration: const InputDecoration(labelText: 'Year', border: OutlineInputBorder()),
-                              items: years.map((y) => DropdownMenuItem(value: y, child: Text(y.toString()))).toList(),
-                              onChanged: (v) { if (v != null) setModalState(() => selectedYear = v); },
-                            ),
+                          Text('Select Units', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                          Row(
+                            children: [
+                              TextButton(
+                                onPressed: () => setModalState(() => selectedUnitIds.addAll(unitsSnap.map((u) => u.id))),
+                                child: const Text('Select All', style: TextStyle(fontSize: 12)),
+                              ),
+                              TextButton(
+                                onPressed: () => setModalState(() => selectedUnitIds.clear()),
+                                child: const Text('Unselect All', style: TextStyle(fontSize: 12)),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 20),
-                      Text('Apply to Units', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      ...unitsSnap.map((unit) {
-                        final checked = selectedUnitIds.contains(unit.id);
-                        return CheckboxListTile(
-                          value: checked,
-                          title: Text('Unit ${unit.unitNumber}'),
-                          subtitle: Text(unit.isOccupied ? 'Occupied' : 'Vacant'),
-                          activeColor: ThemeProvider.accentBlue,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          onChanged: (val) {
-                            setModalState(() {
-                              if (val == true) selectedUnitIds.add(unit.id);
-                              else selectedUnitIds.remove(unit.id);
-                            });
-                          },
-                        );
-                      }),
-                      const SizedBox(height: 16),
-                      SwitchListTile(
-                        title: const Text('Bill to Tenants'),
-                        subtitle: const Text('Add this charge to each selected unit\'s ledger as "Due"'),
-                        value: billToTenants,
-                        onChanged: (v) => setModalState(() => billToTenants = v),
-                        activeColor: ThemeProvider.accentBlue,
-                        contentPadding: EdgeInsets.zero,
-                      ),
+                      ...unitsSnap.map((unit) => CheckboxListTile(
+                        value: selectedUnitIds.contains(unit.id),
+                        title: Text('Unit ${unit.unitNumber}'),
+                        onChanged: (v) => setModalState(() => v == true ? selectedUnitIds.add(unit.id) : selectedUnitIds.remove(unit.id)),
+                      )),
                       const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: ThemeProvider.accentBlue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
+                          style: ElevatedButton.styleFrom(backgroundColor: ThemeProvider.accentBlue, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16)),
                           onPressed: () async {
-                            if (!formKey.currentState!.validate()) return;
-                            if (selectedUnitIds.isEmpty) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Select at least one unit.')));
-                              return;
-                            }
-                            final monthStr = '${selectedYear}-${selectedMonth.toString().padLeft(2, '0')}';
-                            try {
-                              await databaseService.addPropertyExpense(
-                                propertyId: property.id,
-                                ownerId: ownerId,
-                                totalAmount: double.parse(amountController.text),
-                                description: descController.text,
-                                unitIds: selectedUnitIds.toList(),
-                                month: monthStr,
-                                billToTenants: billToTenants,
-                              );
-                              if (ctx.mounted) Navigator.pop(ctx);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Expense split across ${selectedUnitIds.length} unit(s) for $monthStr')),
-                                );
-                              }
-                            } catch (e) {
-                              if (ctx.mounted) {
-                                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e')));
-                              }
-                            }
+                            if (!formKey.currentState!.validate() || selectedUnitIds.isEmpty) return;
+                            final monthStr = '$selectedYear-${selectedMonth.toString().padLeft(2, '0')}';
+                            await databaseService.addPropertyExpense(
+                              propertyId: property.id,
+                              ownerId: ownerId,
+                              totalAmount: double.parse(amountController.text),
+                              description: descController.text,
+                              unitIds: selectedUnitIds.toList(),
+                              month: monthStr,
+                              billToTenants: billToTenants,
+                            );
+                            if (ctx.mounted) Navigator.pop(ctx);
                           },
-                          child: Text('Add Expense', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                          child: const Text('Add Expense'),
                         ),
                       ),
                     ],
@@ -340,132 +470,26 @@ class PropertyDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(Icons.door_front_door_outlined, size: 80, color: Colors.grey.shade300),
-        const SizedBox(height: 24),
-        const Text(
-          'No Units Found',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'Get started by adding units to this property.',
-          style: TextStyle(fontSize: 16, color: Colors.grey),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-
-  void _confirmDelete(BuildContext context, DatabaseService databaseService) {
+  void _confirmDelete(BuildContext context, DatabaseService databaseService, PropertyModel property) {
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Delete Property'),
-          content: Text('Are you sure you want to delete ${property.name}? This will also delete all associated units.'),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(dialogContext).pop(),
-            ),
-            TextButton(
-              child: const Text('Delete', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-              onPressed: () async {
-                Navigator.of(dialogContext).pop();
-                try {
-                  await databaseService.deleteProperty(property.id);
-                  if (context.mounted) {
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${property.name} deleted')));
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
-                }
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class UnitCard extends StatelessWidget {
-  final UnitModel unit;
-  final String? currency;
-
-  const UnitCard({super.key, required this.unit, this.currency});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => UnitDetailScreen(unit: unit))),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: ThemeProvider.primaryNavy.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(Icons.door_front_door_outlined, color: ThemeProvider.primaryNavy),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Unit ${unit.unitNumber}',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        CurrencyHelper.format(unit.monthlyRent, currency),
-                        style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: unit.isOccupied ? Colors.teal.shade50 : Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    unit.isOccupied ? 'Occupied' : 'Vacant',
-                    style: TextStyle(
-                      color: unit.isOccupied ? Colors.teal.shade700 : Colors.red.shade700,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Property'),
+        content: Text('Are you sure you want to delete "${property.name}"? This action cannot be undone and will delete all units and records associated with it.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await databaseService.deleteProperty(property.id);
+              if (context.mounted) {
+                context.go('/properties');
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Property deleted')));
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
-        ),
+        ],
       ),
     );
   }

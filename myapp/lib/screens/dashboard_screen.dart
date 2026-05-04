@@ -9,6 +9,7 @@ import 'package:myapp/screens/add_property_screen.dart';
 import 'package:myapp/screens/property_list_screen.dart';
 import 'package:myapp/screens/all_transactions_screen.dart';
 import 'package:myapp/utils/currency_helper.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:myapp/models/action_item_model.dart';
@@ -20,13 +21,15 @@ import 'package:myapp/models/rent_record_model.dart';
 import 'package:myapp/models/rent_status.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:developer' as developer;
+import 'dart:async';
+import 'package:home_widget/home_widget.dart';
 
 Map<String, dynamic> _calculateSummary(Map<String, dynamic> data) {
   final properties = data['properties'] as List<PropertyModel>;
   final units = data['units'] as List<UnitModel>;
   final records = data['records'] as List<RentRecordModel>;
 
-  final occupiedUnits = units.where((unit) => unit.isOccupied).toList();
+  final occupiedUnits = units.where((unit) => unit.isOccupied).length;
   
   final pendingTotal = records
       .where((r) => r.status != RentStatus.paid)
@@ -39,7 +42,7 @@ Map<String, dynamic> _calculateSummary(Map<String, dynamic> data) {
   return {
     'propertiesCount': properties.length,
     'unitsCount': units.length,
-    'occupiedUnits': occupiedUnits.length,
+    'occupiedUnits': occupiedUnits,
     'pendingTotal': pendingTotal,
     'collectedTotal': collectedTotal,
   };
@@ -55,6 +58,58 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _upcomingRentsKey = GlobalKey();
+  StreamSubscription? _notificationSubscription;
+  List<ActionItem>? _lastActionItems;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationService().requestPermissions();
+      _setupNotificationListener();
+    });
+  }
+
+  Future<void> _updateHomeWidget(List<ActionItem> items) async {
+    final overdue = items.where((i) => i.isOverdue).length;
+    final upcoming = items.where((i) => !i.isOverdue).length;
+
+    await HomeWidget.saveWidgetData<String>('overdue_count', overdue.toString());
+    await HomeWidget.saveWidgetData<String>('upcoming_count', upcoming.toString());
+    await HomeWidget.saveWidgetData<String>('last_updated', 'Updated ${DateFormat('HH:mm').format(DateTime.now())}');
+    
+    await HomeWidget.updateWidget(
+      name: 'NiyanWidgetProvider',
+      androidName: 'NiyanWidgetProvider',
+      iOSName: 'NiyanWidget',
+    );
+  }
+
+  void _setupNotificationListener() {
+    final db = context.read<DatabaseService>();
+    final auth = context.read<AuthService>();
+    
+    _notificationSubscription = auth.user.switchMap((user) {
+      if (user == null || !user.notificationsEnabled || kIsWeb) {
+        if (!kIsWeb) NotificationService().cancelAllNotifications();
+        return Stream.value(<ActionItem>[]);
+      }
+      return db.getActionItems(user.uid).debounceTime(const Duration(seconds: 2));
+    }).listen((items) {
+      final user = Provider.of<UserModel?>(context, listen: false);
+      
+      // Update Home Widget in background
+      if (!kIsWeb) _updateHomeWidget(items);
+
+      if (user != null && user.notificationsEnabled && !kIsWeb) {
+        if (_lastActionItems == null || _lastActionItems!.length != items.length) {
+          developer.log('Rescheduling notifications for ${items.length} items');
+          NotificationService().scheduleRentReminders(items, user.notificationTime, user.notificationFrequency);
+          _lastActionItems = items;
+        }
+      }
+    });
+  }
 
   void _scrollToUpcomingRents() {
     final context = _upcomingRentsKey.currentContext;
@@ -70,6 +125,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _notificationSubscription?.cancel();
     super.dispose();
   }
 
@@ -79,7 +135,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final userStream = authService.user;
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: Colors.white,
       body: StreamBuilder<UserModel?>(
         stream: userStream,
         builder: (context, snapshot) {
@@ -89,52 +145,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
             return const Center(child: Text('User not found.'));
           }
-
           final user = snapshot.data!;
           final databaseService = Provider.of<DatabaseService>(context, listen: false);
-
-          // Sync rent records when viewing dashboard
-          databaseService.ensureRentRecordsExist(user.uid);
 
           return CustomScrollView(
             controller: _scrollController,
             slivers: [
               _buildModernHeroHeader(context, user, authService),
               SliverToBoxAdapter(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1000),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 24),
-                          Text(
-                            'Portfolio Overview',
-                            style: GoogleFonts.inter(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: ThemeProvider.primaryNavy,
-                            ),
+                child: ResponsiveCentered(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 24),
+                        Text(
+                          'Portfolio Overview',
+                          style: GoogleFonts.inter(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: ThemeProvider.primaryNavy,
                           ),
-                          const SizedBox(height: 16),
-                          _buildSummaryCards(databaseService, user),
-                          const SizedBox(height: 32),
-                          Text(
-                            'Upcoming Rents (7 days)',
-                            key: _upcomingRentsKey,
-                            style: GoogleFonts.inter(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: ThemeProvider.primaryNavy,
-                            ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildSummaryCards(databaseService, user),
+                        const SizedBox(height: 32),
+                        Text(
+                          'Upcoming Rents (7 days)',
+                          key: _upcomingRentsKey,
+                          style: GoogleFonts.inter(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: ThemeProvider.primaryNavy,
                           ),
-                          const SizedBox(height: 16),
-                          _ActionCenterList(databaseService: databaseService, user: user),
-                          const SizedBox(height: 100),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 16),
+                        _ActionCenterList(databaseService: databaseService, user: user),
+                        const SizedBox(height: 100),
+                      ],
                     ),
                   ),
                 ),
@@ -147,7 +196,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         backgroundColor: ThemeProvider.accentBlue,
         elevation: 2,
         onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const AddPropertyScreen()));
+          context.push('/add-property');
         },
         icon: const Icon(Icons.add_business_rounded, color: Colors.white),
         label: const Text('Add Property', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -163,7 +212,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       elevation: 0,
       scrolledUnderElevation: 1,
       automaticallyImplyLeading: false,
-      title: Image.asset('assets/images/logo_full.png', height: 28),
+      title: const Text('Niyan', style: TextStyle(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
       centerTitle: true,
       actions: [
         Padding(
@@ -210,7 +259,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final summaryStream = CombineLatestStream.combine3(
       databaseService.getProperties(user.uid).onErrorReturn(<PropertyModel>[]),
       databaseService.allUnits(user.uid).onErrorReturn(<UnitModel>[]),
-      FirebaseFirestore.instance.collection('rent_records').where('ownerId', isEqualTo: user.uid).snapshots().map((s) => s.docs.map((d) => RentRecordModel.fromFirestore(d)).toList()),
+      FirebaseFirestore.instance.collection('rentRecords').where('ownerId', isEqualTo: user.uid).snapshots().map((s) => s.docs.map((d) => RentRecordModel.fromFirestore(d)).toList()),
       (List<PropertyModel> p, List<UnitModel> u, List<RentRecordModel> r) => {'properties': p, 'units': u, 'records': r},
     ).debounceTime(const Duration(milliseconds: 300));
 
@@ -222,7 +271,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
 
         return FutureBuilder<Map<String, dynamic>>(
-          future: compute(_calculateSummary, snapshot.data!),
+          future: Future.value(_calculateSummary(snapshot.data!)),
           builder: (context, futureSnapshot) {
             if (!futureSnapshot.hasData) return const SizedBox.shrink();
             final data = futureSnapshot.data!;
@@ -241,7 +290,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   '${data['propertiesCount']}', 
                   Icons.apartment_rounded, 
                   ThemeProvider.accentBlue,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PropertyListScreen())),
+                  onTap: () => context.push('/properties'),
                 ),
                 _buildKpiCard(context, 'Occupancy', '${data['occupiedUnits']}/${data['unitsCount']}', Icons.door_front_door_rounded, Colors.teal),
                 _buildKpiCard(
@@ -258,7 +307,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   CurrencyHelper.formatNoDecimal(data['collectedTotal'] as double, user.currency), 
                   Icons.account_balance_wallet_rounded, 
                   Colors.purple,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AllTransactionsScreen())),
+                  onTap: () => context.push('/transactions'),
                 ),
               ],
             );
@@ -299,8 +348,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: ThemeProvider.primaryNavy))),
-                Text(title, style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
+                Text(value, style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: ThemeProvider.primaryNavy)),
+                Text(title, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
               ],
             ),
           ],
@@ -327,10 +376,19 @@ class _ActionCenterListState extends State<_ActionCenterList> {
   String _itemKey(ActionItem item) => item.rentRecordId ?? '${item.tenant.id}_${item.month}';
 
   Future<void> _recordPayment(ActionItem item) async {
-    await widget.databaseService.recordRentPayment(
-      item: item,
-      ownerId: widget.user.uid,
-    );
+    if (item.rentRecordId != null) {
+      await widget.databaseService.recordRentPayment(item: item, ownerId: widget.user.uid);
+    } else {
+      await widget.databaseService.recordTransaction(
+        propertyId: item.propertyId,
+        unitId: item.unitId,
+        tenantId: item.tenant.id,
+        amount: item.amount,
+        description: 'Rent for ${item.month}',
+        type: 'income',
+        month: item.month,
+      );
+    }
   }
 
   Future<void> _recordSelectedPayments(List<ActionItem> allItems) async {
@@ -362,12 +420,6 @@ class _ActionCenterListState extends State<_ActionCenterList> {
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox.shrink();
         final actionItems = snapshot.data!;
-
-        if (!kIsWeb && widget.user.notificationsEnabled) {
-          NotificationService().scheduleRentReminders(actionItems, widget.user.notificationTime, widget.user.notificationFrequency);
-        } else if (!kIsWeb) {
-          NotificationService().cancelAllNotifications();
-        }
 
         if (actionItems.isEmpty) {
           return Container(
@@ -490,6 +542,21 @@ class _ActionCenterListState extends State<_ActionCenterList> {
           ],
         );
       },
+    );
+  }
+}
+
+class ResponsiveCentered extends StatelessWidget {
+  final Widget child;
+  const ResponsiveCentered({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1000),
+        child: child,
+      ),
     );
   }
 }

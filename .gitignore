@@ -52,6 +52,7 @@
 **/firebase_options.dart
 **/firebase-debug.log
 **/firebase-debug.*.log
+**/.firebase/
 
 # Generated files
 *.g.dart
