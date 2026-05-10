@@ -50,6 +50,34 @@ class AuthService {
     }
   }
 
+  Future<UserModel?> signUp({
+    required String email,
+    required String password,
+    required String name,
+    required AppRole role,
+  }) async {
+    try {
+      UserCredential result = await _auth.createUserWithEmailAndPassword(
+          email: email, password: password);
+      User? user = result.user;
+      if (user != null) {
+        await _db.collection('users').doc(user.uid).set({
+          'email': user.email,
+          'name': name,
+          'currentRole': role.toString(),
+          'createdAt': FieldValue.serverTimestamp(),
+          'societyIds': [],
+          'notificationsEnabled': true,
+        });
+        return UserModel(uid: user.uid, email: user.email, name: name, currentRole: role);
+      }
+      return null;
+    } catch (e) {
+      debugPrint(e.toString());
+      rethrow;
+    }
+  }
+
   Future<UserModel?> registerWithEmailAndPassword(
       String email, String password) async {
     try {

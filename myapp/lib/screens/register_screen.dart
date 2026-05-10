@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:myapp/services/database_service.dart';
-import '../services/auth_service.dart';
-import '../providers/theme_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:myapp/services/auth_service.dart';
+import 'package:myapp/providers/theme_provider.dart';
+import 'package:myapp/models/user_model.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() => RegisterScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class RegisterScreenState extends State<RegisterScreen> {
-  final _formKey = GlobalKey<FormState>();
+class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
   bool _isLoading = false;
+  AppRole _selectedRole = AppRole.owner; // Default to Property Owner
 
   @override
   void dispose() {
@@ -28,280 +28,208 @@ class RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  Future<void> _performRegister() async {
-    if (!(_formKey.currentState?.validate() ?? false)) {
+  Future<void> _register() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty || _nameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
       return;
     }
 
     setState(() => _isLoading = true);
-
     try {
-      final authService = context.read<AuthService>();
-      final userModel = await authService.registerWithEmailAndPassword(
-        _emailController.text.trim(),
-        _passwordController.text,
+      final authService = Provider.of<AuthService>(context, listen: false);
+      await authService.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        name: _nameController.text.trim(),
+        role: _selectedRole,
       );
-
-      if (!mounted) return;
-
-      if (userModel != null) {
-        final databaseService = context.read<DatabaseService>();
-        await databaseService.setUser(
-          userModel.uid,
-          {
-            'name': _nameController.text.trim(),
-            'email': _emailController.text.trim(),
-          },
-        );
-        if (mounted) {
-          // If login screen is below this, pop to it. Or if using a wrapper, it might just handle auth state.
-          // The wrapper usually handles auth state changes and goes to home screen.
-          Navigator.of(context).pop();
-        }
-      }
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      String errorMessage = "An unknown error occurred.";
-      if (e.code == 'weak-password') {
-        errorMessage = "The password provided is too weak.";
-      } else if (e.code == 'email-already-in-use') {
-        errorMessage = "An account already exists for that email.";
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage)),
-      );
+      // Success: App state will automatically update via AuthService.user stream
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Registration failed: ${e.toString()}")),
-      );
-    } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 900;
-
     return Scaffold(
       backgroundColor: Colors.white,
-      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.transparent, 
         elevation: 0,
-        leading: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Image.asset('assets/images/logo_icon.png', fit: BoxFit.contain),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: ThemeProvider.primaryNavy),
+          onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
-      body: Row(
-        children: [
-          if (isDesktop)
-            Expanded(
-              child: Container(
-                decoration: const BoxDecoration(
-                  image: DecorationImage(
-                    image: NetworkImage(
-                        'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80'),
-                    fit: BoxFit.cover,
-                  ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Join Niyan', style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                const SizedBox(height: 8),
+                Text('Select how you will use the app', style: GoogleFonts.inter(color: Colors.grey.shade600)),
+                const SizedBox(height: 32),
+                
+                Row(
+                  children: [
+                    Expanded(
+                      child: _RoleCard(
+                        title: 'Landlord',
+                        subtitle: 'Standalone Mode',
+                        icon: Icons.home_work_rounded,
+                        selected: _selectedRole == AppRole.owner,
+                        onTap: () => setState(() => _selectedRole = AppRole.owner),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _RoleCard(
+                        title: 'Society',
+                        subtitle: 'Society ERP',
+                        icon: Icons.apartment_rounded,
+                        selected: _selectedRole == AppRole.societyAdmin,
+                        onTap: () => setState(() => _selectedRole = AppRole.societyAdmin),
+                      ),
+                    ),
+                  ],
                 ),
-                child: Container(
+                
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.black.withOpacity(0.1), Colors.black.withOpacity(0.7)],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  padding: const EdgeInsets.all(64),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      const SizedBox(height: 24),
-                      Text(
-                        'Join the modern era.',
-                        style: GoogleFonts.inter(
-                          fontSize: 48,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          height: 1.1,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Create your account to start managing your properties with beautiful precision.',
-                        style: GoogleFonts.inter(fontSize: 20, color: Colors.white70),
-                      ),
-                      const SizedBox(height: 48),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          Expanded(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 64),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 450),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 32.0),
-                            child: Image.asset('assets/images/logo_full.png', height: 56),
-                          ),
-                        ),
-                        Text(
-                          'Create an account',
-                          style: GoogleFonts.inter(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w800,
-                            color: ThemeProvider.primaryNavy,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Sign up below to get started.',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
-                        ),
-                        const SizedBox(height: 48),
-                        Text('Full Name', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: InputDecoration(
-                            hintText: 'John Doe',
-                            prefixIcon: const Icon(Icons.person_outline, color: Colors.grey),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade200),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: ThemeProvider.accentBlue, width: 2),
-                            ),
-                          ),
-                          validator: (value) => value?.isEmpty ?? true ? 'Enter your name' : null,
-                        ),
-                        const SizedBox(height: 24),
-                        Text('Email Address', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            hintText: 'Enter your email',
-                            prefixIcon: const Icon(Icons.email_outlined, color: Colors.grey),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade200),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: ThemeProvider.accentBlue, width: 2),
-                            ),
-                          ),
-                          validator: (value) =>
-                              (value?.isEmpty ?? true) || !value!.contains('@') ? 'Enter a valid email' : null,
-                        ),
-                        const SizedBox(height: 24),
-                        Text('Password', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: true,
-                          autofillHints: const [],
-                          enableSuggestions: false,
-                          autocorrect: false,
-                          decoration: InputDecoration(
-                            hintText: 'At least 6 characters',
-                            prefixIcon: const Icon(Icons.lock_outline_rounded, color: Colors.grey),
-                            filled: true,
-                            fillColor: Colors.grey.shade50,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade200),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: ThemeProvider.accentBlue, width: 2),
-                            ),
-                          ),
-                          validator: (value) =>
-                              (value?.length ?? 0) < 6 ? 'Password must be at least 6 characters' : null,
-                        ),
-                        const SizedBox(height: 48),
-                        SizedBox(
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _performRegister,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: ThemeProvider.accentBlue,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              elevation: 0,
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                  )
-                                : const Text(
-                                    'Register',
-                                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text("Already have an account?", style: TextStyle(color: Colors.grey.shade600)),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                              },
-                              child: const Text(
-                                'Sign in',
-                                style: TextStyle(color: ThemeProvider.accentBlue, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
+                    children: _selectedRole == AppRole.owner 
+                    ? [
+                        _bullet('Direct Landlord-Tenant management'),
+                        _bullet('Rent collection & automated receipts'),
+                        _bullet('Ledger tracking for individual units'),
+                        _bullet('Perfect for individual property owners'),
+                      ]
+                    : [
+                        _bullet('Full Society Management (ERP)'),
+                        _bullet('Security & Visitor Management (Gate)'),
+                        _bullet('Society Notices & Community Board'),
+                        _bullet('Helpdesk, Amenities & Billing'),
                       ],
-                    ),
                   ),
                 ),
-              ),
+                
+                const SizedBox(height: 32),
+                TextField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Full Name',
+                    prefixIcon: const Icon(Icons.person_outline_rounded, color: ThemeProvider.primaryNavy),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: ThemeProvider.primaryNavy, width: 2)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _emailController,
+                  decoration: InputDecoration(
+                    labelText: 'Email',
+                    prefixIcon: const Icon(Icons.email_outlined, color: ThemeProvider.primaryNavy),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: ThemeProvider.primaryNavy, width: 2)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    prefixIcon: const Icon(Icons.lock_outline_rounded, color: ThemeProvider.primaryNavy),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: ThemeProvider.primaryNavy, width: 2)),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _register,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ThemeProvider.primaryNavy,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('Create Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Center(
+                  child: TextButton(
+                    onPressed: () => context.go('/login'),
+                    child: const Text('Already have an account? Login', style: TextStyle(color: ThemeProvider.primaryNavy, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _bullet(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_rounded, size: 16, color: ThemeProvider.accentTeal),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade700))),
         ],
+      ),
+    );
+  }
+}
+
+class _RoleCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _RoleCard({required this.title, required this.subtitle, required this.icon, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: selected ? ThemeProvider.accentTeal.withOpacity(0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: selected ? ThemeProvider.accentTeal : Colors.grey.shade200, width: 2),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: selected ? ThemeProvider.accentTeal : Colors.grey.shade400, size: 32),
+            const SizedBox(height: 12),
+            Text(title, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: selected ? ThemeProvider.accentTeal : ThemeProvider.primaryNavy)),
+            const SizedBox(height: 4),
+            Text(subtitle, textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 10, color: Colors.grey.shade500)),
+          ],
+        ),
       ),
     );
   }

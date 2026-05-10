@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+enum AppRole { superAdmin, societyAdmin, treasurer, guard, resident, tenant, owner }
+
 class UserModel {
   final String uid;
   final String? email;
@@ -11,7 +13,11 @@ class UserModel {
   final String currency;
   final bool notificationsEnabled;
   final String notificationTime;
+  final String notificationTimezone;
   final String notificationFrequency;
+  final List<String> societyIds;
+  final String? activeSocietyId;
+  final AppRole currentRole;
 
   UserModel({
     required this.uid,
@@ -23,7 +29,11 @@ class UserModel {
     this.currency = 'USD',
     this.notificationsEnabled = false,
     this.notificationTime = '09:00',
+    this.notificationTimezone = 'UTC',
     this.notificationFrequency = 'Daily',
+    this.societyIds = const [],
+    this.activeSocietyId,
+    this.currentRole = AppRole.resident,
   });
 
   factory UserModel.fromFirebaseAuthUser(User user) {
@@ -48,7 +58,14 @@ class UserModel {
       currency: data['currency'] ?? 'USD',
       notificationsEnabled: data['notificationsEnabled'] ?? false,
       notificationTime: data['notificationTime'] ?? '09:00',
+      notificationTimezone: data['notificationTimezone'] ?? 'UTC',
       notificationFrequency: data['notificationFrequency'] ?? 'Daily',
+      societyIds: List<String>.from(data['societyIds'] ?? []),
+      activeSocietyId: data['activeSocietyId'],
+      currentRole: AppRole.values.firstWhere(
+        (e) => e.toString() == data['currentRole'],
+        orElse: () => AppRole.resident,
+      ),
     );
   }
 
@@ -62,7 +79,11 @@ class UserModel {
       'currency': currency,
       'notificationsEnabled': notificationsEnabled,
       'notificationTime': notificationTime,
+      'notificationTimezone': notificationTimezone,
       'notificationFrequency': notificationFrequency,
+      'societyIds': societyIds,
+      'activeSocietyId': activeSocietyId,
+      'currentRole': currentRole.toString(),
     };
   }
 
@@ -75,7 +96,11 @@ class UserModel {
     String? currency,
     bool? notificationsEnabled,
     String? notificationTime,
+    String? notificationTimezone,
     String? notificationFrequency,
+    List<String>? societyIds,
+    String? activeSocietyId,
+    AppRole? currentRole,
   }) {
     return UserModel(
       uid: uid,
@@ -87,7 +112,11 @@ class UserModel {
       currency: currency ?? this.currency,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       notificationTime: notificationTime ?? this.notificationTime,
+      notificationTimezone: notificationTimezone ?? this.notificationTimezone,
       notificationFrequency: notificationFrequency ?? this.notificationFrequency,
+      societyIds: societyIds ?? this.societyIds,
+      activeSocietyId: activeSocietyId ?? this.activeSocietyId,
+      currentRole: currentRole ?? this.currentRole,
     );
   }
 }

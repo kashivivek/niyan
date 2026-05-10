@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import 'package:myapp/models/user_model.dart';
 import 'package:myapp/services/auth_service.dart';
 import 'package:myapp/services/database_service.dart';
 import 'package:myapp/services/image_service.dart';
 import 'package:myapp/providers/theme_provider.dart';
+import 'package:myapp/providers/app_mode_provider.dart';
 import 'package:myapp/services/notification_service.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:developer' as developer;
@@ -29,7 +31,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   
   bool _notificationsEnabled = false;
   TimeOfDay _notificationTime = const TimeOfDay(hour: 9, minute: 0);
+  String _notificationTimezone = 'UTC';
   String _notificationFrequency = 'Daily';
+
+  static const _commonTimezones = [
+    'Device Local Time', 'UTC', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 
+    'Europe/Berlin', 'Asia/Kolkata', 'Asia/Singapore', 'Australia/Sydney'
+  ];
 
   static const _validCurrencyCodes = [
     'USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD',
@@ -50,6 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _nameController.text = user.name ?? '';
       _selectedCurrency = _validCurrencyCodes.contains(user.currency) ? user.currency : 'USD';
       _notificationsEnabled = user.notificationsEnabled;
+      _notificationTimezone = user.notificationTimezone.isNotEmpty ? user.notificationTimezone : 'Device Local Time';
       _notificationFrequency = user.notificationFrequency;
       _currentUserId = user.uid;
       
@@ -131,6 +140,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         currency: _selectedCurrency,
         notificationsEnabled: _notificationsEnabled,
         notificationTime: '${_notificationTime.hour.toString().padLeft(2, '0')}:${_notificationTime.minute.toString().padLeft(2, '0')}',
+        notificationTimezone: _notificationTimezone,
         notificationFrequency: _notificationFrequency,
       );
 
@@ -253,6 +263,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         if (picked != null) setState(() => _notificationTime = picked);
                       },
                     ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _commonTimezones.contains(_notificationTimezone) ? _notificationTimezone : 'Device Local Time',
+                      decoration: _inputDecoration('Timezone', Icons.public),
+                      items: _commonTimezones.map((tz) => DropdownMenuItem(value: tz, child: Text(tz))).toList(),
+                      onChanged: (v) => setState(() => _notificationTimezone = v!),
+                    ),
+                    const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
                       value: _notificationFrequency,
                       decoration: _inputDecoration('Frequency', Icons.repeat),
@@ -281,7 +299,95 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: _isLoading ? null : _saveSettings,
                     child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
+                  _buildSectionTitle('APP MODE'),
+                  const SizedBox(height: 12),
+                  Consumer<AppModeProvider>(
+                    builder: (context, appMode, _) {
+                      return Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  appMode.isSocietyMode
+                                      ? Icons.apartment_rounded
+                                      : Icons.person_outline_rounded,
+                                  color: ThemeProvider.accentBlue,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  appMode.isSocietyMode
+                                      ? 'Society ERP Mode'
+                                      : 'Standalone Mode',
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                    color: ThemeProvider.primaryNavy,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: ThemeProvider.accentBlue
+                                        .withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    'Active',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: ThemeProvider.accentBlue,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (appMode.activeSociety != null) ...
+                              [
+                                const SizedBox(height: 6),
+                                Text(
+                                  appMode.activeSociety!.name,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: Colors.grey.shade500),
+                                ),
+                              ],
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () =>
+                                    context.push('/select-society'),
+                                icon: const Icon(Icons.swap_horiz_rounded,
+                                    size: 18),
+                                label: const Text('Switch Mode / Society'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: ThemeProvider.accentBlue,
+                                  side: const BorderSide(
+                                      color: ThemeProvider.accentBlue),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red,

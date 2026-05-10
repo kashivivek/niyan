@@ -32,6 +32,13 @@ class DatabaseService {
     developer.log('Updating user profile for ${user.uid}: ${user.toMap()}');
     return _db.collection('users').doc(user.uid).set(user.toMap(), SetOptions(merge: true));
   }
+  Future<UserModel?> getUser(String uid) async {
+    final doc = await _db.collection('users').doc(uid).get();
+    if (doc.exists) {
+      return UserModel.fromFirestore(doc);
+    }
+    return null;
+  }
 
   // Properties
   Stream<List<PropertyModel>> getProperties(String ownerId) {

@@ -85,12 +85,6 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        title: Text('Financial Records', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-      ),
       body: Column(
         children: [
           _buildMonthPagination(),
@@ -104,7 +98,7 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
 
                 final details = snapshot.data!;
                 return ListView.builder(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 120),
                   itemCount: details.length,
                   itemBuilder: (context, index) => _buildTransactionCard(details[index], user.currency),
                 );

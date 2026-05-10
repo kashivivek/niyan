@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -244,7 +245,7 @@ class LoginScreenState extends State<LoginScreen> {
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: ThemeProvider.accentBlue, width: 2),
+                              borderSide: const BorderSide(color: ThemeProvider.primaryNavy, width: 2),
                             ),
                           ),
                           textInputAction: TextInputAction.next,
@@ -274,7 +275,7 @@ class LoginScreenState extends State<LoginScreen> {
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: ThemeProvider.accentBlue, width: 2),
+                              borderSide: const BorderSide(color: ThemeProvider.primaryNavy, width: 2),
                             ),
                           ),
                           textInputAction: TextInputAction.go,
@@ -288,7 +289,7 @@ class LoginScreenState extends State<LoginScreen> {
                             onPressed: _showForgotPasswordDialog,
                             child: const Text(
                               'Forgot Password?',
-                              style: TextStyle(color: ThemeProvider.accentBlue, fontWeight: FontWeight.bold),
+                              style: TextStyle(color: ThemeProvider.primaryNavy, fontWeight: FontWeight.bold),
                             ),
                           ),
                         ),
@@ -298,7 +299,7 @@ class LoginScreenState extends State<LoginScreen> {
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _performLogin,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: ThemeProvider.accentBlue,
+                              backgroundColor: ThemeProvider.primaryNavy,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               elevation: 0,
                             ),
@@ -320,14 +321,10 @@ class LoginScreenState extends State<LoginScreen> {
                           children: [
                             Text("Don't have an account?", style: TextStyle(color: Colors.grey.shade600)),
                             TextButton(
-                              onPressed: () {
-                                Navigator.of(context).pushReplacement(
-                                  MaterialPageRoute(builder: (context) => const RegisterScreen()),
-                                );
-                              },
+                              onPressed: () => context.go('/register'),
                               child: const Text(
                                 'Sign up',
-                                style: TextStyle(color: ThemeProvider.accentBlue, fontWeight: FontWeight.bold),
+                                style: TextStyle(color: ThemeProvider.primaryNavy, fontWeight: FontWeight.bold),
                               ),
                             ),
                           ],

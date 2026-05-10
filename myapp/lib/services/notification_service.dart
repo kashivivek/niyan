@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:myapp/models/action_item_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:developer' as developer;
 
 // NOTE: We avoid importing dart:html directly as it breaks mobile builds.
@@ -43,14 +44,18 @@ class NotificationService {
       iOS: initializationSettingsIOS,
     );
 
-    await _flutterLocalNotificationsPlugin.initialize(
-      settings: initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse notificationResponse) async {
-        // Handle notification tapped logic here if needed
-      },
-    );
-
-    _isInitialized = true;
+    try {
+      await _flutterLocalNotificationsPlugin.initialize(
+        settings: initializationSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse notificationResponse) async {
+          // Handle notification tapped logic here if needed
+        },
+      );
+      _isInitialized = true;
+    } catch (e) {
+      developer.log('Notification initialization failed', error: e);
+      // We don't rethrow to avoid crashing the whole app
+    }
   }
 
   Future<bool> requestPermissions() async {
@@ -141,7 +146,29 @@ class NotificationService {
     );
   }
 
-  Future<void> scheduleRentReminders(List<ActionItem> actionItems, String timeStr, String frequency) async {
+  /// Broadcasts a notice to all members of a society.
+  /// In a real app, this would trigger an FCM topic broadcast.
+  Future<void> broadcastSocietyNotice({
+    required String societyId,
+    required String title,
+    required String body,
+  }) async {
+    developer.log('Broadcasting notice for society $societyId: $title');
+    
+    // 1. Show immediate notification for the current user if they are in this society
+    await showImmediateNotification(title, body);
+
+    // 2. Persist notification in Firestore for residents to see in an 'Alerts' or 'Notifications' tab
+    await FirebaseFirestore.instance.collection('society_notifications').add({
+      'societyId': societyId,
+      'title': title,
+      'body': body,
+      'timestamp': FieldValue.serverTimestamp(),
+      'type': 'notice',
+    });
+  }
+
+  Future<void> scheduleRentReminders(List<ActionItem> actionItems, String timeStr, String timezoneStr, String frequency) async {
     if (kIsWeb) return;
 
     await cancelAllNotifications(); // Clear existing
@@ -162,14 +189,25 @@ class NotificationService {
       final title = 'Rent Due: ${item.tenant.name}';
       final body = '${item.amount.toStringAsFixed(0)} is ${item.isOverdue ? 'overdue' : 'due'} for ${item.month}.';
       
-      tz.TZDateTime scheduledDate = _nextInstanceOfTime(hour, minute);
+      tz.Location location;
+      try {
+        if (timezoneStr == 'Device Local Time' || timezoneStr.isEmpty) {
+          location = tz.local;
+        } else {
+          location = tz.getLocation(timezoneStr);
+        }
+      } catch (_) {
+        location = tz.local;
+      }
+      
+      tz.TZDateTime scheduledDate = _nextInstanceOfTime(hour, minute, location);
 
       developer.log('Scheduling notification for ${item.tenant.name} at $scheduledDate');
       
       if (frequency == 'On Due Date') {
         final dueDate = item.dueDate;
-        final scheduleTime = tz.TZDateTime.local(dueDate.year, dueDate.month, dueDate.day, hour, minute);
-        if (scheduleTime.isBefore(tz.TZDateTime.now(tz.local))) {
+        final scheduleTime = tz.TZDateTime(location, dueDate.year, dueDate.month, dueDate.day, hour, minute);
+        if (scheduleTime.isBefore(tz.TZDateTime.now(location))) {
             developer.log('Skipping ${item.tenant.name} - due date is in the past.');
             continue;
         }
@@ -207,9 +245,9 @@ class NotificationService {
     }
   }
 
-  tz.TZDateTime _nextInstanceOfTime(int hour, int minute) {
-    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-    tz.TZDateTime scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+  tz.TZDateTime _nextInstanceOfTime(int hour, int minute, tz.Location location) {
+    final tz.TZDateTime now = tz.TZDateTime.now(location);
+    tz.TZDateTime scheduledDate = tz.TZDateTime(location, now.year, now.month, now.day, hour, minute);
     
     // If it's already past this time today, schedule for tomorrow
     if (scheduledDate.isBefore(now)) {
