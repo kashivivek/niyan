@@ -1,11 +1,273 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read/write access to all documents for any signed-in user.
-    // This is a good starting point for development, but you should
-    // implement more granular rules for production.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    // ─────────────────────────────────────────────────────────
+    // Helper functions
+    // ─────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    // Check if the user is a member of the society
+    function isMember(societyId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/societies/$(societyId)/members/$(request.auth.uid));
+    }
+
+    // Get the user's role in a society
+    function getMemberRole(societyId) {
+      return get(/databases/$(database)/documents/societies/$(societyId)/members/$(request.auth.uid)).data.role;
+    }
+
+    // Check if user is admin or super admin
+    function isAdmin(societyId) {
+      return isMember(societyId) &&
+        (getMemberRole(societyId) == 'SocietyRole.admin' ||
+         getMemberRole(societyId) == 'SocietyRole.superAdmin');
+    }
+
+    // Check if user can approve (admin or committee)
+    function canApprove(societyId) {
+      return isMember(societyId) &&
+        (getMemberRole(societyId) == 'SocietyRole.superAdmin' ||
+         getMemberRole(societyId) == 'SocietyRole.admin' ||
+         getMemberRole(societyId) == 'SocietyRole.committee');
+    }
+
+    // Check if user is a resident (owner or tenant)
+    function isResident(societyId) {
+      return isMember(societyId) &&
+        (getMemberRole(societyId) == 'SocietyRole.owner' ||
+         getMemberRole(societyId) == 'SocietyRole.tenant');
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Users collection
+    // ─────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isSignedIn() && isOwner(userId);
+      allow write: if isSignedIn() && isOwner(userId);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Societies collection
+    // ─────────────────────────────────────────────────────────
+    match /societies/{societyId} {
+      // Any signed-in user can read society info (for join flows)
+      allow read: if isSignedIn();
+      // Only admins can create/update/delete societies
+      allow create: if isSignedIn();
+      allow update: if isAdmin(societyId);
+      allow delete: if isMember(societyId) &&
+        getMemberRole(societyId) == 'SocietyRole.superAdmin';
+
+      // Members subcollection
+      match /members/{memberId} {
+        // Members can read their own record; admins can read all
+        allow read: if isSignedIn() && (isOwner(memberId) || isAdmin(societyId));
+        // Only admins can write members (invite, update role, remove)
+        allow write: if isSignedIn() && (isOwner(memberId) || isAdmin(societyId));
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Standalone mode: Properties (scoped by ownerId)
+    // ─────────────────────────────────────────────────────────
+    match /properties/{propertyId} {
+      allow read: if isSignedIn() &&
+        resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() &&
+        request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isSignedIn() &&
+        resource.data.ownerId == request.auth.uid;
+
+      // Units subcollection
+      match /units/{unitId} {
+        allow read, write: if isSignedIn() &&
+          get(/databases/$(database)/documents/properties/$(propertyId)).data.ownerId == request.auth.uid;
+
+        // Tenancy history subcollection
+        match /tenancyHistory/{historyId} {
+          allow read, write: if isSignedIn() &&
+            get(/databases/$(database)/documents/properties/$(propertyId)).data.ownerId == request.auth.uid;
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Standalone mode: Tenants (scoped by ownerId)
+    // ─────────────────────────────────────────────────────────
+    match /tenants/{tenantId} {
+      allow read, write: if isSignedIn() &&
+        resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() &&
+        request.resource.data.ownerId == request.auth.uid;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Standalone mode: Transactions (scoped by ownerId)
+    // ─────────────────────────────────────────────────────────
+    match /transactions/{transactionId} {
+      allow read, write: if isSignedIn() &&
+        resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() &&
+        request.resource.data.ownerId == request.auth.uid;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Standalone mode: Rent Records (scoped by ownerId)
+    // ─────────────────────────────────────────────────────────
+    match /rentRecords/{recordId} {
+      allow read, write: if isSignedIn() &&
+        resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() &&
+        request.resource.data.ownerId == request.auth.uid;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Visitors (society mode — any member can read/write)
+    // ─────────────────────────────────────────────────────────
+    match /visitors/{visitorId} {
+      allow read: if isSignedIn() &&
+        (resource.data.residentId == request.auth.uid ||
+         isMember(resource.data.societyId));
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() &&
+        (resource.data.residentId == request.auth.uid ||
+         isMember(resource.data.societyId));
+      allow delete: if isSignedIn() &&
+        isAdmin(resource.data.societyId);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Daily Help (residents manage their own staff)
+    // ─────────────────────────────────────────────────────────
+    match /dailyHelp/{helpId} {
+      allow read: if isSignedIn() &&
+        (resource.data.residentId == request.auth.uid ||
+         isMember(resource.data.societyId));
+      allow create: if isSignedIn() &&
+        request.resource.data.residentId == request.auth.uid;
+      allow update: if isSignedIn() &&
+        (resource.data.residentId == request.auth.uid ||
+         isMember(resource.data.societyId));
+      allow delete: if isSignedIn() &&
+        resource.data.residentId == request.auth.uid;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Invoices (society & standalone)
+    // ─────────────────────────────────────────────────────────
+    match /invoices/{invoiceId} {
+      allow read: if isSignedIn() &&
+        (resource.data.ownerId == request.auth.uid ||
+         isMember(resource.data.societyId) ||
+         resource.data.residentId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() &&
+        (resource.data.ownerId == request.auth.uid ||
+         canApprove(resource.data.societyId));
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Vendors & Purchase Orders
+    // ─────────────────────────────────────────────────────────
+    match /vendors/{vendorId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() &&
+        (resource.data.ownerId == request.auth.uid ||
+         canApprove(resource.data.societyId));
+    }
+
+    match /purchaseOrders/{poId} {
+      allow read: if isSignedIn() &&
+        (resource.data.ownerId == request.auth.uid ||
+         isMember(resource.data.societyId));
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() &&
+        (resource.data.ownerId == request.auth.uid ||
+         canApprove(resource.data.societyId));
+      allow delete: if isSignedIn() &&
+        isAdmin(resource.data.societyId);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Phase 3: Administrative Workflows
+    // ─────────────────────────────────────────────────────────
+    match /tickets/{ticketId} {
+      allow read: if isSignedIn() &&
+        (resource.data.residentId == request.auth.uid ||
+         isMember(resource.data.societyId));
+      allow create: if isSignedIn() &&
+        request.resource.data.residentId == request.auth.uid;
+      allow update: if isSignedIn() &&
+        (resource.data.residentId == request.auth.uid ||
+         isMember(resource.data.societyId));
+      allow delete: if isSignedIn() &&
+        isAdmin(resource.data.societyId);
+    }
+
+    match /assets/{assetId} {
+      allow read: if isSignedIn() && isMember(resource.data.societyId);
+      allow write: if isSignedIn() && isAdmin(resource.data.societyId);
+    }
+
+    match /amenities/{amenityId} {
+      allow read: if isSignedIn() && isMember(resource.data.societyId);
+      allow write: if isSignedIn() && isAdmin(resource.data.societyId);
+    }
+
+    match /amenityBookings/{bookingId} {
+      allow read: if isSignedIn() &&
+        (resource.data.residentId == request.auth.uid ||
+         isMember(resource.data.societyId));
+      allow create: if isSignedIn() &&
+        request.resource.data.residentId == request.auth.uid;
+      allow update, delete: if isSignedIn() &&
+        (resource.data.residentId == request.auth.uid ||
+         isAdmin(resource.data.societyId));
+    }
+
+    match /leases/{leaseId} {
+      allow read: if isSignedIn() &&
+        (resource.data.tenantId == request.auth.uid ||
+         resource.data.ownerId == request.auth.uid ||
+         isAdmin(resource.data.societyId));
+      allow write: if isSignedIn() &&
+        (resource.data.ownerId == request.auth.uid ||
+         isAdmin(resource.data.societyId));
+    }
+
+    match /parkingSpots/{spotId} {
+      allow read: if isSignedIn() && isMember(resource.data.societyId);
+      allow write: if isSignedIn() && isAdmin(resource.data.societyId);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Phase 4: Community Engagement
+    // ─────────────────────────────────────────────────────────
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn() && isMember(resource.data.societyId);
+      allow write: if isSignedIn() && isAdmin(resource.data.societyId);
+    }
+
+    match /polls/{pollId} {
+      allow read: if isSignedIn() && isMember(resource.data.societyId);
+      allow create: if isSignedIn() && isAdmin(resource.data.societyId);
+      allow update: if isSignedIn() && isMember(resource.data.societyId);
+      allow delete: if isSignedIn() && isAdmin(resource.data.societyId);
+    }
+
+    match /sharedDocuments/{docId} {
+      allow read: if isSignedIn() && isMember(resource.data.societyId);
+      allow write: if isSignedIn() && isAdmin(resource.data.societyId);
     }
   }
 }

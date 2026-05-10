@@ -6,7 +6,17 @@ import 'package:myapp/models/user_model.dart';
 import 'package:myapp/services/auth_service.dart';
 import 'package:myapp/services/database_service.dart';
 import 'package:myapp/services/image_service.dart';
+import 'package:myapp/services/billing_service.dart';
+import 'package:myapp/services/property_service.dart';
+import 'package:myapp/services/tenant_service.dart';
+import 'package:myapp/services/transaction_service.dart';
+import 'package:myapp/services/vendor_service.dart';
+import 'package:myapp/services/society_service.dart';
+import 'package:myapp/services/visitor_service.dart';
+import 'package:myapp/services/admin_service.dart';
+import 'package:myapp/services/community_service.dart';
 import 'package:myapp/providers/theme_provider.dart';
+import 'package:myapp/providers/app_mode_provider.dart';
 import 'package:myapp/firebase_options.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:myapp/services/notification_service.dart';
@@ -37,12 +47,18 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   late final AuthService _authService;
   late final AppRouter _appRouter;
+  late final AppModeProvider _appModeProvider;
 
   @override
   void initState() {
     super.initState();
     _authService = AuthService();
-    _appRouter = AppRouter(_authService);
+    _appModeProvider = AppModeProvider();
+    _appRouter = AppRouter(_authService, _appModeProvider);
+    // Load persisted mode after frame renders
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _appModeProvider.loadSavedMode();
+    });
   }
 
   @override
@@ -50,9 +66,22 @@ class _MyAppState extends State<MyApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => ThemeProvider()),
+        ChangeNotifierProvider.value(value: _appModeProvider),
         Provider<AuthService>.value(value: _authService),
+        // Legacy monolithic service — kept for backward compatibility
+        // Screens are gradually migrating to domain-specific services below
         Provider<DatabaseService>(create: (_) => DatabaseService()),
         Provider<ImageService>(create: (_) => ImageService()),
+        // New domain-specific services (Phase 0)
+        Provider<PropertyService>(create: (_) => PropertyService()),
+        Provider<TenantService>(create: (_) => TenantService()),
+        Provider<BillingService>(create: (_) => BillingService()),
+        Provider<TransactionService>(create: (_) => TransactionService()),
+        Provider<SocietyService>(create: (_) => SocietyService()),
+        Provider<VendorService>(create: (_) => VendorService()),
+        Provider<VisitorService>(create: (_) => VisitorService()),
+        Provider<AdminService>(create: (_) => AdminService()),
+        Provider<CommunityService>(create: (_) => CommunityService()),
         StreamProvider<UserModel?>(
           create: (context) => _authService.user,
           initialData: null,

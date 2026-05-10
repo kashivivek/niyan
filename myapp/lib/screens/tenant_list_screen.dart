@@ -7,6 +7,7 @@ import 'package:myapp/screens/tenant_detail_screen.dart';
 import 'package:myapp/models/user_model.dart';
 import 'package:myapp/providers/theme_provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class TenantListScreen extends StatelessWidget {
   const TenantListScreen({super.key});
@@ -16,85 +17,62 @@ class TenantListScreen extends StatelessWidget {
     final databaseService = Provider.of<DatabaseService>(context, listen: false);
     final user = Provider.of<UserModel?>(context);
 
+    if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+
+    final isDesktop = MediaQuery.of(context).size.width > 900;
+
     return Scaffold(
-      appBar: AppBar(
-        leadingWidth: 160,
-        leading: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-          child: Image.asset('assets/images/logo_full.png', fit: BoxFit.contain),
-        ),
-        title: const SizedBox.shrink(),
-      ),
-      body: user == null
-          ? const Center(child: CircularProgressIndicator())
-          : StreamBuilder<List<TenantModel>>(
-              stream: databaseService.getAllTenants(user.uid),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return _buildEmptyState(context);
-                }
+      backgroundColor: const Color(0xFFF9FAFB),
+      body: StreamBuilder<List<TenantModel>>(
+        stream: databaseService.getAllTenants(user.uid),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+          final tenants = snapshot.data ?? [];
+          if (tenants.isEmpty) {
+            return _buildEmptyState(context);
+          }
 
-                final tenants = snapshot.data!;
-                final screenWidth = MediaQuery.of(context).size.width;
-                final crossAxisCount = screenWidth > 1200 ? 3 : (screenWidth > 800 ? 2 : 1);
-
-                return GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 0,
-                    mainAxisExtent: 105,
-                  ),
-                  itemCount: tenants.length,
-                  itemBuilder: (context, index) {
-                    return TenantCard(tenant: tenants[index]);
-                  },
-                );
-              },
+          return GridView.builder(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: isDesktop ? 3 : 1,
+              crossAxisSpacing: 20,
+              mainAxisSpacing: 20,
+              mainAxisExtent: 100,
             ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: ThemeProvider.accentBlue,
-        child: const Icon(Icons.person_add_rounded, color: Colors.white),
-        onPressed: () => context.push('/tenants/add'),
+            itemCount: tenants.length,
+            itemBuilder: (context, index) {
+              return TenantCard(tenant: tenants[index]);
+            },
+          );
+        },
+      ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 90),
+        child: FloatingActionButton.extended(
+          backgroundColor: ThemeProvider.primaryNavy,
+          onPressed: () => context.push('/tenants/add'),
+          icon: const Icon(Icons.person_add_rounded, color: Colors.white),
+          label: Text('Add Tenant', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+        ),
       ),
     );
   }
 
   Widget _buildEmptyState(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: ThemeProvider.primaryNavy.withOpacity(0.05),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.people_alt_rounded, size: 80, color: ThemeProvider.primaryNavy.withOpacity(0.5)),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No Tenants Yet',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 22),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'You haven\'t added any tenants. Tap the + icon below to get started.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-            ),
-          ],
-        ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.people_outline_rounded, size: 64, color: Colors.grey.shade200),
+          const SizedBox(height: 16),
+          Text('No tenants found', style: GoogleFonts.outfit(fontSize: 16, color: Colors.grey.shade400)),
+        ],
       ),
     );
   }

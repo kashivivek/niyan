@@ -4,6 +4,8 @@ import 'package:myapp/models/property_model.dart';
 import 'package:myapp/services/auth_service.dart';
 import 'package:myapp/services/database_service.dart';
 import 'package:myapp/widgets/responsive_centered.dart';
+import 'package:myapp/providers/theme_provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AddPropertyScreen extends StatefulWidget {
   const AddPropertyScreen({super.key});
@@ -60,70 +62,104 @@ class AddPropertyScreenState extends State<AddPropertyScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Property'),
+        backgroundColor: Colors.white,
+        foregroundColor: ThemeProvider.primaryNavy,
+        elevation: 0,
       ),
-      body: ResponsiveCentered(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a name';
-                  }
-                  return null;
-                },
+      backgroundColor: const Color(0xFFF9FAFB),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: InputDecoration(
+                      labelText: 'Property Name',
+                      hintText: 'e.g. Skyline Apartments',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: ThemeProvider.primaryNavy, width: 2)),
+                      prefixIcon: const Icon(Icons.business_rounded, color: ThemeProvider.primaryNavy),
+                    ),
+                    validator: (value) => value == null || value.isEmpty ? 'Enter property name' : null,
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: _addressController,
+                    decoration: InputDecoration(
+                      labelText: 'Address',
+                      hintText: 'Full street address',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: ThemeProvider.primaryNavy, width: 2)),
+                      prefixIcon: const Icon(Icons.location_on_rounded, color: ThemeProvider.primaryNavy),
+                    ),
+                    validator: (value) => value == null || value.isEmpty ? 'Enter address' : null,
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: _cityController,
+                    decoration: InputDecoration(
+                      labelText: 'City',
+                      hintText: 'e.g. San Francisco',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: ThemeProvider.primaryNavy, width: 2)),
+                      prefixIcon: const Icon(Icons.location_city_rounded, color: ThemeProvider.primaryNavy),
+                    ),
+                    validator: (value) => value == null || value.isEmpty ? 'Enter city' : null,
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: _imageUrlController,
+                    decoration: InputDecoration(
+                      labelText: 'Image URL (Optional)',
+                      hintText: 'https://...',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: ThemeProvider.primaryNavy, width: 2)),
+                      prefixIcon: const Icon(Icons.image_outlined, color: ThemeProvider.primaryNavy),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  DropdownButtonFormField<PropertyType>(
+                    value: _selectedType,
+                    decoration: InputDecoration(
+                      labelText: 'Property Type',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: ThemeProvider.primaryNavy, width: 2)),
+                      prefixIcon: const Icon(Icons.category_outlined, color: ThemeProvider.primaryNavy),
+                    ),
+                    items: PropertyType.values.map((type) {
+                      return DropdownMenuItem(
+                        value: type,
+                        child: Text(type.toString().split('.').last.toUpperCase()),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _selectedType = value;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 32),
+                  ElevatedButton(
+                    onPressed: _submitForm,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ThemeProvider.primaryNavy,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: Text('CREATE PROPERTY', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  ),
+                ],
               ),
-              TextFormField(
-                controller: _addressController,
-                decoration: const InputDecoration(labelText: 'Address'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter an address';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _cityController,
-                decoration: const InputDecoration(labelText: 'City'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a city';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _imageUrlController,
-                decoration: const InputDecoration(labelText: 'Image URL'),
-              ),
-              DropdownButtonFormField<PropertyType>(
-                initialValue: _selectedType,
-                decoration: const InputDecoration(labelText: 'Property Type'),
-                items: PropertyType.values.map((type) {
-                  return DropdownMenuItem(
-                    value: type,
-                    child: Text(type.toString().split('.').last),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _selectedType = value;
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _submitForm,
-                child: const Text('Add Property'),
-              ),
-            ],
+            ),
           ),
         ),
       ),

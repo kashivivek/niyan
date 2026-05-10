@@ -15,10 +15,11 @@ class ThemeProvider with ChangeNotifier {
     return _themeMode == ThemeMode.light ? lightTheme : darkTheme;
   }
 
-  // Zillow-style modern color palette
-  static const Color primaryNavy = Color(0xFF2A2A33); // Deep grey-blue for text
-  static const Color accentBlue = Color(0xFF006AFF); // Vibrant Zillow CTA blue
-  static const Color backgroundLight = Color(0xFFF9FAFB); // Off-white clean background
+  // Brand-aligned colors from the logo
+  static const Color primaryNavy = Color(0xFF0D1B3E); // Deep Navy from Logo
+  static const Color accentTeal = Color(0xFF26C6DA); // Vibrant Teal from Logo
+  static const Color accentBlue = accentTeal; // Alias for backward compatibility
+  static const Color backgroundLight = Color(0xFFF9FAFB); 
   static const Color cardLight = Colors.white;
 
   static final ThemeData lightTheme = ThemeData(
@@ -27,7 +28,7 @@ class ThemeProvider with ChangeNotifier {
     primaryColor: primaryNavy,
     colorScheme: const ColorScheme.light(
       primary: primaryNavy,
-      secondary: accentBlue,
+      secondary: accentTeal,
       surface: cardLight,
     ),
     appBarTheme: AppBarTheme(
@@ -50,7 +51,7 @@ class ThemeProvider with ChangeNotifier {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: accentBlue,
+        backgroundColor: primaryNavy,
         foregroundColor: Colors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
@@ -60,17 +61,21 @@ class ThemeProvider with ChangeNotifier {
         ),
       ),
     ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: accentTeal),
+    ),
     cardTheme: CardThemeData(
       color: cardLight,
       elevation: 0,
+      margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200, width: 1),
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: Colors.grey.shade100, width: 1.5),
       ),
     ),
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
       backgroundColor: cardLight,
-      selectedItemColor: accentBlue,
+      selectedItemColor: accentTeal,
       unselectedItemColor: Colors.grey.shade400,
       showUnselectedLabels: true,
       type: BottomNavigationBarType.fixed,
@@ -82,15 +87,15 @@ class ThemeProvider with ChangeNotifier {
 
   static final ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,
-    scaffoldBackgroundColor: const Color(0xFF0B0F19),
+    scaffoldBackgroundColor: const Color(0xFF0B1426),
     primaryColor: Colors.white,
     colorScheme: const ColorScheme.dark(
       primary: Colors.white,
-      secondary: accentBlue,
+      secondary: accentTeal,
       surface: Color(0xFF1E293B),
     ),
     appBarTheme: AppBarTheme(
-      backgroundColor: const Color(0xFF0B0F19),
+      backgroundColor: const Color(0xFF0B1426),
       foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: true,
@@ -108,7 +113,7 @@ class ThemeProvider with ChangeNotifier {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: accentBlue,
+        backgroundColor: accentTeal,
         foregroundColor: Colors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
@@ -124,16 +129,6 @@ class ThemeProvider with ChangeNotifier {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
-    ),
-    bottomNavigationBarTheme: BottomNavigationBarThemeData(
-      backgroundColor: const Color(0xFF1E293B),
-      selectedItemColor: accentBlue,
-      unselectedItemColor: Colors.grey.shade500,
-      showUnselectedLabels: true,
-      type: BottomNavigationBarType.fixed,
-      elevation: 8,
-      selectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 12),
-      unselectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 12),
     ),
   );
 }
