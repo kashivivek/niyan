@@ -10,6 +10,8 @@ import 'package:myapp/models/invoice_model.dart';
 import 'package:myapp/providers/theme_provider.dart';
 import 'package:myapp/providers/app_mode_provider.dart';
 import 'package:myapp/utils/currency_helper.dart';
+import 'package:myapp/services/database_service.dart';
+import 'package:myapp/models/unit_model.dart';
 
 class ResidentDashboardScreen extends StatelessWidget {
   const ResidentDashboardScreen({super.key});
@@ -19,13 +21,18 @@ class ResidentDashboardScreen extends StatelessWidget {
     final user = Provider.of<UserModel?>(context);
     final appMode = Provider.of<AppModeProvider>(context);
     final billingService = Provider.of<BillingService>(context, listen: false);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth > 900;
 
     if (user == null || appMode.activeSociety == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator(color: ThemeProvider.accentTeal)));
     }
 
-    final isOwner = appMode.activeMembership?.role == SocietyRole.owner || 
-                    appMode.activeMembership?.role == SocietyRole.admin;
+    final showStats = appMode.activeMembership?.role == SocietyRole.owner || 
+                      appMode.activeMembership?.role == SocietyRole.admin ||
+                      appMode.activeMembership?.role == SocietyRole.superAdmin;
+
+    final isOwnerOrAdmin = showStats;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
@@ -38,32 +45,39 @@ class ResidentDashboardScreen extends StatelessWidget {
           label: Text('SOS', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Welcome section moved to header, start directly with dues or insights
-            if (isOwner) ...[
-              Text('Welcome back, ${(user.name?.split(' ') ?? ['Resident']).first}!', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
-              const SizedBox(height: 16),
-              _buildOwnerStats(context),
-              const SizedBox(height: 32),
-            ],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isDesktop ? 960 : double.infinity),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (isOwnerOrAdmin) ...[
+                  Text('Welcome back, ${(user.name?.split(' ') ?? ['Resident']).first}!', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                  const SizedBox(height: 16),
+                  if (showStats) _buildOwnerStats(context),
+                  const SizedBox(height: 24),
+                ],
 
-            _buildDuesSection(context, user, billingService),
-            
-            const SizedBox(height: 32),
-            
-            Text('Quick Services', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
-            const SizedBox(height: 20),
-            
-            _buildServiceGrid(context),
-            
-            const SizedBox(height: 32),
-            _buildActivitySection(context),
-            const SizedBox(height: 120), // Bottom padding for Nav Bar
-          ],
+                if (appMode.activeMembership?.role == SocietyRole.owner) ...[
+                  const SizedBox(height: 24),
+                  Text('My Properties', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                  const SizedBox(height: 16),
+                  _buildOwnedUnitsSection(context, user, appMode),
+                ],
+
+                _buildDuesSection(context, user, billingService),
+                const SizedBox(height: 28),
+                Text('Quick Services', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                const SizedBox(height: 16),
+                _buildServiceGrid(context, isDesktop),
+                const SizedBox(height: 28),
+                _buildActivitySection(context),
+                const SizedBox(height: 120),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -142,7 +156,7 @@ class ResidentDashboardScreen extends StatelessWidget {
           children: [
             _OwnerStatCard(
               title: 'Occupancy', 
-              value: '94%', // Mock for now, can be calculated from unit stats
+              value: '94%',
               icon: Icons.house_rounded, 
               color: ThemeProvider.primaryNavy
             ),
@@ -161,21 +175,47 @@ class ResidentDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildServiceGrid(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 20,
-      crossAxisSpacing: 20,
-      children: [
-        _ServiceIcon(title: 'Visitors', icon: Icons.person_add_alt_1_rounded, color: ThemeProvider.accentTeal, onTap: () => context.push('/visitors/invite')),
-        _ServiceIcon(title: 'Helpdesk', icon: Icons.support_agent_rounded, color: ThemeProvider.primaryNavy, onTap: () => context.push('/helpdesk')),
-        _ServiceIcon(title: 'Amenities', icon: Icons.sports_tennis_rounded, color: ThemeProvider.accentTeal, onTap: () => context.push('/amenities')),
-        _ServiceIcon(title: 'Notices', icon: Icons.campaign_rounded, color: ThemeProvider.primaryNavy, onTap: () => context.push('/notices')),
-        _ServiceIcon(title: 'Polls', icon: Icons.how_to_vote_rounded, color: ThemeProvider.accentTeal, onTap: () => context.push('/polls')),
-        _ServiceIcon(title: 'Payments', icon: Icons.payments_rounded, color: ThemeProvider.primaryNavy, onTap: () => context.push('/resident-ledger')),
-      ],
+  Widget _buildServiceGrid(BuildContext context, bool isDesktop) {
+    final services = [
+      _ServiceData('Visitors', Icons.person_add_alt_1_rounded, ThemeProvider.accentTeal, () => context.push('/visitors/invite')),
+      _ServiceData('Helpdesk', Icons.support_agent_rounded, ThemeProvider.primaryNavy, () => context.push('/helpdesk')),
+      _ServiceData('Amenities', Icons.sports_tennis_rounded, const Color(0xFF6C5CE7), () => context.push('/amenities')),
+      _ServiceData('Notices', Icons.campaign_rounded, const Color(0xFFE17055), () => context.push('/notices')),
+      _ServiceData('Polls', Icons.how_to_vote_rounded, const Color(0xFF00B894), () => context.push('/polls')),
+      _ServiceData('Payments', Icons.payments_rounded, ThemeProvider.primaryNavy, () => context.push('/resident-ledger')),
+      _ServiceData('Parking', Icons.local_parking_rounded, const Color(0xFF0984E3), () => context.push('/parking')),
+      _ServiceData('Documents', Icons.folder_rounded, const Color(0xFFFDAE61), () => context.push('/documents')),
+      _ServiceData('Directory', Icons.contacts_rounded, ThemeProvider.accentTeal, () => context.push('/directory')),
+      _ServiceData('Daily Help', Icons.handyman_rounded, const Color(0xFFE84393), () => context.push('/daily-help')),
+    ];
+
+    final crossAxisCount = isDesktop ? 5 : 5;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade100),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: isDesktop ? 1.1 : 0.85,
+        ),
+        itemCount: services.length,
+        itemBuilder: (context, index) {
+          final s = services[index];
+          return _CompactServiceIcon(title: s.title, icon: s.icon, color: s.color, onTap: s.onTap);
+        },
+      ),
     );
   }
 
@@ -249,6 +289,65 @@ class ResidentDashboardScreen extends StatelessWidget {
       );
     }
   }
+
+  Widget _buildOwnedUnitsSection(BuildContext context, UserModel user, AppModeProvider appMode) {
+    final db = Provider.of<DatabaseService>(context, listen: false);
+    return StreamBuilder<List<UnitModel>>(
+      stream: db.getSocietyUnits(appMode.activeSociety!.id),
+      builder: (context, snapshot) {
+        final units = (snapshot.data ?? []).where((u) => u.ownerId == user.uid).toList();
+        if (units.isEmpty) return const SizedBox.shrink();
+
+        return SizedBox(
+          height: 120,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: units.length,
+            itemBuilder: (context, index) {
+              final u = units[index];
+              return Container(
+                width: 180,
+                margin: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.grey.shade100),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(u.unitNumber, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Icon(
+                          u.isOccupied ? Icons.person_rounded : Icons.door_front_door_rounded,
+                          size: 14,
+                          color: u.isOccupied ? ThemeProvider.accentTeal : Colors.grey,
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    Text(u.isOccupied ? 'Occupied' : 'Vacant', style: GoogleFonts.inter(fontSize: 10, color: Colors.grey.shade500)),
+                    Text(CurrencyHelper.format(u.monthlyRent, user.currency), style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy, fontSize: 14)),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ServiceData {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  const _ServiceData(this.title, this.icon, this.color, this.onTap);
 }
 
 class _OwnerStatCard extends StatelessWidget {
@@ -282,29 +381,44 @@ class _OwnerStatCard extends StatelessWidget {
   }
 }
 
-class _ServiceIcon extends StatelessWidget {
+class _CompactServiceIcon extends StatelessWidget {
   final String title;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  const _ServiceIcon({required this.title, required this.icon, required this.color, required this.onTap});
+  const _CompactServiceIcon({required this.title, required this.icon, required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(20)),
-            child: Icon(icon, color: color, size: 28),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                title,
+                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: ThemeProvider.primaryNavy),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(title, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: ThemeProvider.primaryNavy)),
-        ],
+        ),
       ),
     );
   }

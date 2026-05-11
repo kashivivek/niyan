@@ -62,13 +62,18 @@ class NoticeBoardScreen extends StatelessWidget {
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-            itemCount: announcements.length,
-            itemBuilder: (context, index) {
-              final announcement = announcements[index];
-              return _AnnouncementCard(announcement: announcement);
-            },
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 700),
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                itemCount: announcements.length,
+                itemBuilder: (context, index) {
+                  final announcement = announcements[index];
+                  return _AnnouncementCard(announcement: announcement);
+                },
+              ),
+            ),
           );
         },
       ),
@@ -80,60 +85,128 @@ class NoticeBoardScreen extends StatelessWidget {
     final contentController = TextEditingController();
     AnnouncementPriority priority = AnnouncementPriority.normal;
 
-    await showDialog(
+    await showModalBottomSheet(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('Post New Notice', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(labelText: 'Title', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: contentController,
-                  decoration: const InputDecoration(labelText: 'Content', border: OutlineInputBorder()),
-                  maxLines: 5,
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<AnnouncementPriority>(
-                  value: priority,
-                  decoration: const InputDecoration(labelText: 'Priority', border: OutlineInputBorder()),
-                  items: AnnouncementPriority.values.map((p) => DropdownMenuItem(value: p, child: Text(p.toString().split('.').last.toUpperCase()))).toList(),
-                  onChanged: (v) => setDialogState(() => priority = v!),
-                ),
-              ],
+      useRootNavigator: true,
+      isScrollControlled: true,
+      useSafeArea: false,
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          return Container(
+            height: MediaQuery.of(ctx).size.height * 0.85,
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
-            ElevatedButton(
-              onPressed: () async {
-                if (titleController.text.isEmpty || contentController.text.isEmpty) return;
-                
-                final communityService = Provider.of<CommunityService>(context, listen: false);
-                await communityService.createAnnouncement(AnnouncementModel(
-                  id: '',
-                  societyId: appMode.activeSociety!.id,
-                  title: titleController.text.trim(),
-                  content: contentController.text.trim(),
-                  authorId: user.uid,
-                  authorName: user.name ?? 'Admin',
-                  priority: priority,
-                  createdAt: DateTime.now(),
-                ));
-                
-                if (context.mounted) Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: ThemeProvider.primaryNavy, foregroundColor: Colors.white),
-              child: const Text('POST NOTICE'),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(4)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text('Post New Notice',
+                      style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: titleController,
+                    decoration: InputDecoration(
+                      labelText: 'Title',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: TextField(
+                      controller: contentController,
+                      decoration: InputDecoration(
+                        labelText: 'Content',
+                        alignLabelWithHint: true,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                      ),
+                      maxLines: null,
+                      expands: true,
+                      textAlignVertical: TextAlignVertical.top,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<AnnouncementPriority>(
+                    value: priority,
+                    decoration: InputDecoration(
+                      labelText: 'Priority',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                    ),
+                    items: AnnouncementPriority.values
+                        .map((p) => DropdownMenuItem(
+                              value: p,
+                              child: Text(p.toString().split('.').last.toUpperCase()),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setSheetState(() => priority = v!),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('CANCEL'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            if (titleController.text.isEmpty || contentController.text.isEmpty) return;
+                            final communityService = Provider.of<CommunityService>(ctx, listen: false);
+                            await communityService.createAnnouncement(AnnouncementModel(
+                              id: '',
+                              societyId: appMode.activeSociety!.id,
+                              title: titleController.text.trim(),
+                              content: contentController.text.trim(),
+                              authorId: user.uid,
+                              authorName: user.name ?? 'Admin',
+                              priority: priority,
+                              createdAt: DateTime.now(),
+                            ));
+                            if (ctx.mounted) Navigator.pop(ctx);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ThemeProvider.primaryNavy,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('POST NOTICE'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

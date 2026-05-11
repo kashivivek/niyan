@@ -13,6 +13,7 @@ class SocietyModel {
   final String? logoUrl;
   final String createdBy; // userId of the creator (becomes super admin)
   final DateTime createdAt;
+  final List<String> memberIds;
   final SocietySettings settings;
 
   SocietyModel({
@@ -25,6 +26,7 @@ class SocietyModel {
     this.logoUrl,
     required this.createdBy,
     required this.createdAt,
+    this.memberIds = const [],
     this.settings = const SocietySettings(),
   });
 
@@ -40,6 +42,7 @@ class SocietyModel {
       logoUrl: data['logoUrl'],
       createdBy: data['createdBy'] ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      memberIds: List<String>.from(data['memberIds'] ?? []),
       settings: data['settings'] != null
           ? SocietySettings.fromMap(data['settings'] as Map<String, dynamic>)
           : const SocietySettings(),
@@ -56,6 +59,7 @@ class SocietyModel {
       'logoUrl': logoUrl,
       'createdBy': createdBy,
       'createdAt': Timestamp.fromDate(createdAt),
+      'memberIds': memberIds,
       'settings': settings.toMap(),
     };
   }
@@ -70,6 +74,7 @@ class SocietyModel {
     String? logoUrl,
     String? createdBy,
     DateTime? createdAt,
+    List<String>? memberIds,
     SocietySettings? settings,
   }) {
     return SocietyModel(
@@ -82,6 +87,7 @@ class SocietyModel {
       logoUrl: logoUrl ?? this.logoUrl,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
+      memberIds: memberIds ?? this.memberIds,
       settings: settings ?? this.settings,
     );
   }

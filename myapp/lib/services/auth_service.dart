@@ -61,15 +61,56 @@ class AuthService {
           email: email, password: password);
       User? user = result.user;
       if (user != null) {
-        await _db.collection('users').doc(user.uid).set({
+        // --- Automated Tenant Onboarding ---
+        // Check if this email is already registered as a tenant in any society
+        final tenantQuery = await _db.collection('tenants')
+            .where('email', isEqualTo: email)
+            .limit(1)
+            .get();
+
+        String? autoSocietyId;
+        bool isAutoResident = false;
+
+        if (tenantQuery.docs.isNotEmpty) {
+          final tenantData = tenantQuery.docs.first.data();
+          final String? foundSocietyId = tenantData['societyId'] as String?;
+          
+          // Only auto-onboard if the tenant is associated with a society
+          if (foundSocietyId != null) {
+            autoSocietyId = foundSocietyId;
+            isAutoResident = true;
+            
+            // 1. Add to society's member list
+            await _db.collection('societies').doc(autoSocietyId).update({
+              'memberIds': FieldValue.arrayUnion([user.uid])
+            });
+
+            // 2. Create the member record
+            await _db.collection('societies').doc(autoSocietyId).collection('members').doc(user.uid).set({
+              'id': user.uid,
+              'societyId': autoSocietyId,
+              'role': 'SocietyRole.tenant',
+              'displayName': name,
+              'status': 'MemberStatus.active',
+              'joinedAt': FieldValue.serverTimestamp(),
+              'unitIds': [tenantData['assignedUnitId']],
+            });
+          }
+        }
+
+        final userData = {
           'email': user.email,
           'name': name,
-          'currentRole': role.toString(),
+          'currentRole': isAutoResident ? AppRole.resident.toString() : role.toString(),
           'createdAt': FieldValue.serverTimestamp(),
-          'societyIds': [],
+          'societyIds': autoSocietyId != null ? [autoSocietyId] : [],
+          'activeSocietyId': autoSocietyId,
+          'activeMode': autoSocietyId != null ? 'society' : 'standalone',
           'notificationsEnabled': true,
-        });
-        return UserModel(uid: user.uid, email: user.email, name: name, currentRole: role);
+        };
+
+        await _db.collection('users').doc(user.uid).set(userData);
+        return UserModel.fromFirestore(await _db.collection('users').doc(user.uid).get());
       }
       return null;
     } catch (e) {
@@ -113,6 +154,23 @@ class AuthService {
     } catch (e) {
       debugPrint(e.toString());
       return;
+    }
+  }
+
+  /// Persist the user's active mode and active society ID to Firestore
+  /// so it can be restored on any device at login.
+  static Future<void> persistUserMode({
+    required String uid,
+    required String mode, // 'standalone' or 'society'
+    String? activeSocietyId,
+  }) async {
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'activeMode': mode,
+        'activeSocietyId': activeSocietyId,
+      });
+    } catch (e) {
+      debugPrint('persistUserMode error: $e');
     }
   }
 }

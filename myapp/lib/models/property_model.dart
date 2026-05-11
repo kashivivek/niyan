@@ -38,6 +38,7 @@ class PropertyModel {
   final String? imageUrl;
   final PropertyType type;
   final String ownerId;
+  final String? societyId; // Null for standalone, set for society-managed properties
   final List<MaintenanceContact> maintenanceContacts;
 
   PropertyModel({
@@ -48,6 +49,7 @@ class PropertyModel {
     this.imageUrl,
     required this.type,
     required this.ownerId,
+    this.societyId,
     this.maintenanceContacts = const [],
   });
 
@@ -64,6 +66,7 @@ class PropertyModel {
         orElse: () => PropertyType.flat,
       ),
       ownerId: data['ownerId'] ?? '',
+      societyId: data['societyId'] as String?,
       maintenanceContacts: (data['maintenanceContacts'] as List? ?? [])
           .map((item) => MaintenanceContact.fromMap(Map<String, dynamic>.from(item)))
           .toList(),
@@ -78,6 +81,7 @@ class PropertyModel {
       'imageUrl': imageUrl,
       'type': type.toString(),
       'ownerId': ownerId,
+      'societyId': societyId,
       'maintenanceContacts': maintenanceContacts.map((c) => c.toMap()).toList(),
     };
   }
@@ -90,6 +94,7 @@ class PropertyModel {
     String? imageUrl,
     PropertyType? type,
     String? ownerId,
+    String? societyId,
     List<MaintenanceContact>? maintenanceContacts,
   }) {
     return PropertyModel(
@@ -100,6 +105,7 @@ class PropertyModel {
       imageUrl: imageUrl ?? this.imageUrl,
       type: type ?? this.type,
       ownerId: ownerId ?? this.ownerId,
+      societyId: societyId ?? this.societyId,
       maintenanceContacts: maintenanceContacts ?? this.maintenanceContacts,
     );
   }

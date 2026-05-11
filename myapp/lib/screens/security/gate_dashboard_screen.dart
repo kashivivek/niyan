@@ -53,7 +53,10 @@ class _GateDashboardScreenState extends State<GateDashboardScreen>
       body: Stack(
         children: [
           SafeArea(
-            child: Column(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 960),
+                child: Column(
               children: [
                 _buildGuardHeader(society.name),
                 Expanded(
@@ -98,6 +101,8 @@ class _GateDashboardScreenState extends State<GateDashboardScreen>
                   ),
                 ),
               ],
+            ),
+            ),
             ),
           ),
           if (_isScanning)

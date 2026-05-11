@@ -15,6 +15,7 @@ class UnitModel {
   final String? currentTenancyHistoryId;
   final List<String> previousTenantIds;
   final double balanceDue;
+  final String? societyId;
   final DateTime? rentPaymentDate;
   final DateTime? lastVacatedDate;
 
@@ -33,6 +34,7 @@ class UnitModel {
     this.currentTenancyHistoryId,
     this.previousTenantIds = const [],
     this.balanceDue = 0.0,
+    this.societyId,
     this.rentPaymentDate,
     this.lastVacatedDate,
   });
@@ -57,6 +59,7 @@ class UnitModel {
       currentTenancyHistoryId: data['currentTenancyHistoryId'] as String?,
       previousTenantIds: List<String>.from(data['previousTenantIds'] ?? []),
       balanceDue: (data['balanceDue'] ?? 0).toDouble(),
+      societyId: data['societyId'] as String?,
       rentPaymentDate: data['rentPaymentDate'] != null ? (data['rentPaymentDate'] as Timestamp).toDate() : null,
       lastVacatedDate: data['lastVacatedDate'] != null ? (data['lastVacatedDate'] as Timestamp).toDate() : null,
     );
@@ -77,6 +80,7 @@ class UnitModel {
       'currentTenancyHistoryId': currentTenancyHistoryId,
       'previousTenantIds': previousTenantIds,
       'balanceDue': balanceDue,
+      'societyId': societyId,
       'rentPaymentDate': rentPaymentDate != null ? Timestamp.fromDate(rentPaymentDate!) : null,
       'lastVacatedDate': lastVacatedDate != null ? Timestamp.fromDate(lastVacatedDate!) : null,
     };
@@ -97,6 +101,7 @@ class UnitModel {
     String? currentTenancyHistoryId,
     List<String>? previousTenantIds,
     double? balanceDue,
+    String? societyId,
     DateTime? rentPaymentDate,
     DateTime? lastVacatedDate,
   }) {
@@ -115,6 +120,7 @@ class UnitModel {
       currentTenancyHistoryId: currentTenancyHistoryId ?? this.currentTenancyHistoryId,
       previousTenantIds: previousTenantIds ?? this.previousTenantIds,
       balanceDue: balanceDue ?? this.balanceDue,
+      societyId: societyId ?? this.societyId,
       rentPaymentDate: rentPaymentDate ?? this.rentPaymentDate,
       lastVacatedDate: lastVacatedDate ?? this.lastVacatedDate,
     );

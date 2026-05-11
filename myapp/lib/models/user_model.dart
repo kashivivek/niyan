@@ -18,6 +18,7 @@ class UserModel {
   final List<String> societyIds;
   final String? activeSocietyId;
   final AppRole currentRole;
+  final String? activeMode; // 'standalone' | 'society' — stored in Firestore for cross-device persistence
 
   UserModel({
     required this.uid,
@@ -34,6 +35,7 @@ class UserModel {
     this.societyIds = const [],
     this.activeSocietyId,
     this.currentRole = AppRole.resident,
+    this.activeMode,
   });
 
   factory UserModel.fromFirebaseAuthUser(User user) {
@@ -66,6 +68,7 @@ class UserModel {
         (e) => e.toString() == data['currentRole'],
         orElse: () => AppRole.resident,
       ),
+      activeMode: data['activeMode'],
     );
   }
 
@@ -84,6 +87,7 @@ class UserModel {
       'societyIds': societyIds,
       'activeSocietyId': activeSocietyId,
       'currentRole': currentRole.toString(),
+      'activeMode': activeMode,
     };
   }
 
@@ -101,6 +105,7 @@ class UserModel {
     List<String>? societyIds,
     String? activeSocietyId,
     AppRole? currentRole,
+    String? activeMode,
   }) {
     return UserModel(
       uid: uid,
@@ -117,6 +122,7 @@ class UserModel {
       societyIds: societyIds ?? this.societyIds,
       activeSocietyId: activeSocietyId ?? this.activeSocietyId,
       currentRole: currentRole ?? this.currentRole,
+      activeMode: activeMode ?? this.activeMode,
     );
   }
 }

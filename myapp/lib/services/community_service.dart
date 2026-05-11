@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:myapp/models/community_post_model.dart';
 import 'package:myapp/models/announcement_model.dart';
 import 'package:myapp/models/poll_model.dart';
@@ -6,6 +8,7 @@ import 'package:myapp/models/shared_document_model.dart';
 
 class CommunityService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   // ──────────────────────────────────────────────
   // Community Posts (Forum)
@@ -20,8 +23,24 @@ class CommunityService {
         .map((snap) => snap.docs.map((d) => CommunityPost.fromFirestore(d)).toList());
   }
 
+  Future<CommunityPost?> getPostById(String postId) async {
+    final doc = await _db.collection('communityPosts').doc(postId).get();
+    if (!doc.exists) return null;
+    return CommunityPost.fromFirestore(doc);
+  }
+
   Future<void> createPost(CommunityPost post) async {
     await _db.collection('communityPosts').add(post.toFirestore());
+  }
+
+  Future<String?> uploadPostImage(File image) async {
+    try {
+      final ref = _storage.ref().child('community_posts/${DateTime.now().millisecondsSinceEpoch}.jpg');
+      final uploadTask = await ref.putFile(image);
+      return await uploadTask.ref.getDownloadURL();
+    } catch (e) {
+      return null;
+    }
   }
 
   Future<void> deletePost(String postId) async {
