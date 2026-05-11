@@ -7,7 +7,10 @@ import 'package:myapp/models/community_post_model.dart';
 import 'package:myapp/providers/app_mode_provider.dart';
 import 'package:myapp/providers/theme_provider.dart';
 import 'package:myapp/services/community_service.dart';
+import 'package:myapp/models/member_model.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
@@ -18,6 +21,10 @@ class CommunityScreen extends StatefulWidget {
 
 class _CommunityScreenState extends State<CommunityScreen> {
   final _captionController = TextEditingController();
+  File? _selectedImage;
+  bool _isPosting = false;
+  Stream<List<CommunityPost>>? _postsStream;
+  String? _lastSocietyId;
 
   @override
   void dispose() {
@@ -25,118 +32,252 @@ class _CommunityScreenState extends State<CommunityScreen> {
     super.dispose();
   }
 
+  void _initStream(String societyId) {
+    if (_postsStream != null && _lastSocietyId == societyId) return;
+    _postsStream = CommunityService().getPosts(societyId);
+    _lastSocietyId = societyId;
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    if (pickedFile != null) {
+      setState(() {
+        _selectedImage = File(pickedFile.path);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<UserModel?>(context);
     final appMode = Provider.of<AppModeProvider>(context);
-    final communityService = CommunityService();
 
     if (user == null || appMode.activeSociety == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: ThemeProvider.accentTeal)));
     }
 
-    final isAdmin = user.currentRole == AppRole.societyAdmin || user.currentRole == AppRole.superAdmin;
+    _initStream(appMode.activeSociety!.id);
+
+    final membership = appMode.activeMembership;
+    // Resilient admin check: Fallback to global user role if membership is still loading
+    final isAdmin = membership?.role.isAdmin ?? (user.currentRole == AppRole.societyAdmin || user.currentRole == AppRole.superAdmin);
+    final isManager = membership?.role == SocietyRole.committee;
+    final canManagePosts = isAdmin || isManager;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF1F5F9), // Lighter slate background
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 90),
-        child: FloatingActionButton(
-          onPressed: () => _showCreatePostDialog(context, user, appMode.activeSociety!.id),
-          backgroundColor: ThemeProvider.accentTeal,
-          child: const Icon(Icons.add_rounded, color: Colors.white),
+        child: FloatingActionButton.extended(
+          onPressed: () => _showCreatePostDialog(context, user, membership, appMode.activeSociety!.id),
+          backgroundColor: ThemeProvider.primaryNavy,
+          icon: const Icon(Icons.add_rounded, color: Colors.white),
+          label: Text('Post', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
         ),
       ),
-      body: StreamBuilder<List<CommunityPost>>(
-        stream: communityService.getPosts(appMode.activeSociety!.id),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final posts = snapshot.data ?? [];
-          
-          if (posts.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.forum_outlined, size: 64, color: Colors.grey.shade300),
-                  const SizedBox(height: 16),
-                  Text('Start the conversation!', style: GoogleFonts.outfit(fontSize: 16, color: Colors.grey.shade400)),
-                ],
-              ),
-            );
-          }
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            floating: true,
+            title: Text('Community Forum', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.white,
+            foregroundColor: ThemeProvider.primaryNavy,
+            elevation: 0,
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Divider(height: 1, color: Colors.grey.shade100),
+            ),
+          ),
+          StreamBuilder<List<CommunityPost>>(
+            stream: _postsStream,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SliverFillRemaining(child: Center(child: CircularProgressIndicator()));
+              }
+              final posts = snapshot.data ?? [];
+              
+              if (posts.isEmpty) {
+                return SliverFillRemaining(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.forum_outlined, size: 64, color: Colors.grey.shade200),
+                        const SizedBox(height: 16),
+                        Text('No posts yet in this society.', style: GoogleFonts.outfit(fontSize: 16, color: Colors.grey.shade400)),
+                      ],
+                    ),
+                  ),
+                );
+              }
 
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-            itemCount: posts.length,
-            itemBuilder: (context, index) {
-              final post = posts[index];
-              return _CommunityPostCard(post: post, isAdmin: isAdmin);
+              return SliverPadding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                sliver: SliverToBoxAdapter(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 650),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+                        itemCount: posts.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final post = posts[index];
+                          return _CommunityPostCard(post: post, isAdmin: canManagePosts);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              );
             },
-          );
-        },
+          ),
+        ],
       ),
     );
   }
 
-  Future<void> _showCreatePostDialog(BuildContext context, UserModel user, String societyId) async {
+  Future<void> _showCreatePostDialog(BuildContext context, UserModel user, MemberModel? membership, String societyId) async {
+    _captionController.clear();
+    setState(() => _selectedImage = null);
+
     await showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Create Community Post', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _captionController,
-                decoration: InputDecoration(
-                  hintText: "What's happening in your society?",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                ),
-                maxLines: 4,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.8,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    if (_captionController.text.trim().isEmpty) return;
-                    await CommunityService().createPost(CommunityPost(
-                      id: '',
-                      societyId: societyId,
-                      authorId: user.uid,
-                      authorName: user.name ?? 'Resident',
-                      authorAvatar: user.photoUrl,
-                      caption: _captionController.text.trim(),
-                      createdAt: DateTime.now(),
-                    ));
-                    _captionController.clear();
-                    if (context.mounted) Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: ThemeProvider.primaryNavy, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                  child: const Text('POST TO COMMUNITY'),
-                ),
+              child: Column(
+                children: [
+                  AppBar(
+                    title: Text('Create Post', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18)),
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
+                    leading: CloseButton(onPressed: () => Navigator.pop(context)),
+                    actions: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: _isPosting 
+                          ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                          : TextButton(
+                              onPressed: () async {
+                                if (_captionController.text.trim().isEmpty) return;
+                                
+                                setModalState(() => _isPosting = true);
+                                String? imageUrl;
+                                if (_selectedImage != null) {
+                                  imageUrl = await CommunityService().uploadPostImage(_selectedImage!);
+                                }
+
+                                await CommunityService().createPost(CommunityPost(
+                                  id: '',
+                                  societyId: societyId,
+                                  authorId: user.uid,
+                                  authorName: membership?.displayName ?? user.name ?? 'Resident',
+                                  authorAvatar: user.photoUrl,
+                                  caption: _captionController.text.trim(),
+                                  imageUrl: imageUrl,
+                                  createdAt: DateTime.now(),
+                                ));
+
+                                setModalState(() => _isPosting = false);
+                                if (context.mounted) Navigator.pop(context);
+                              },
+                              style: TextButton.styleFrom(
+                                backgroundColor: ThemeProvider.primaryNavy,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              ),
+                              child: const Text('Post'),
+                            ),
+                      ),
+                    ],
+                  ),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.all(20),
+                      children: [
+                        TextField(
+                          controller: _captionController,
+                          decoration: InputDecoration(
+                            hintText: "What's on your mind?",
+                            hintStyle: GoogleFonts.inter(color: Colors.grey.shade400),
+                            border: InputBorder.none,
+                          ),
+                          maxLines: null,
+                          style: GoogleFonts.inter(fontSize: 16),
+                          autofocus: true,
+                        ),
+                        if (_selectedImage != null) ...[
+                          const SizedBox(height: 20),
+                          Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Image.file(_selectedImage!, width: double.infinity, fit: BoxFit.cover),
+                              ),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: CircleAvatar(
+                                  backgroundColor: Colors.black.withOpacity(0.5),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                                    onPressed: () {
+                                      setModalState(() => _selectedImage = null);
+                                      setState(() => _selectedImage = null);
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 8 + MediaQuery.of(context).padding.bottom),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () async {
+                            final picker = ImagePicker();
+                            final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+                            if (pickedFile != null) {
+                              setModalState(() => _selectedImage = File(pickedFile.path));
+                              setState(() => _selectedImage = File(pickedFile.path));
+                            }
+                          },
+                          icon: const Icon(Icons.image_outlined, color: ThemeProvider.primaryNavy),
+                          tooltip: 'Add Photo',
+                        ),
+                        IconButton(
+                          onPressed: () {}, // Future: Polls
+                          icon: const Icon(Icons.poll_outlined, color: ThemeProvider.primaryNavy),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-      ),
+            );
+          }
+        );
+      },
     );
   }
 }
@@ -151,84 +292,100 @@ class _CommunityPostCard extends StatelessWidget {
     final user = Provider.of<UserModel?>(context);
     final communityService = CommunityService();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15, offset: const Offset(0, 5))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: ThemeProvider.accentTeal.withOpacity(0.1),
-                  child: Text(post.authorName[0], style: const TextStyle(color: ThemeProvider.accentTeal, fontWeight: FontWeight.bold)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(post.authorName, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
-                      Text(DateFormat('MMM d, HH:mm').format(post.createdAt), style: GoogleFonts.inter(fontSize: 11, color: Colors.grey.shade400)),
-                    ],
+    return InkWell(
+      onTap: () => context.push('/community/post/${post.id}'),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: ThemeProvider.primaryNavy.withOpacity(0.05),
+                    child: Text(post.authorName[0], style: const TextStyle(color: ThemeProvider.primaryNavy, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(post.authorName, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15, color: ThemeProvider.primaryNavy)),
+                        Text(DateFormat('MMM d • HH:mm').format(post.createdAt), style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
+                      ],
+                    ),
+                  ),
+                  if (isAdmin || post.authorId == user?.uid)
+                    IconButton(
+                      icon: Icon(Icons.more_vert_rounded, color: Colors.grey.shade400, size: 20),
+                      onPressed: () => _showOptions(context, communityService),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text(
+                post.caption, 
+                style: GoogleFonts.inter(fontSize: 15, color: ThemeProvider.primaryNavy, height: 1.4)
+              ),
+            ),
+            if (post.imageUrl != null) ...[
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(0),
+                child: Image.network(
+                  post.imageUrl!, 
+                  width: double.infinity, 
+                  height: 300,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 200,
+                    color: Colors.grey.shade100,
+                    child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
                   ),
                 ),
-                if (isAdmin || post.authorId == user?.uid)
-                  IconButton(
-                    icon: Icon(Icons.more_horiz_rounded, color: Colors.grey.shade400),
-                    onPressed: () => _showOptions(context, communityService),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
+              child: Row(
+                children: [
+                  _ActionButton(
+                    icon: post.likes.contains(user?.uid) ? Icons.thumb_up_alt_rounded : Icons.thumb_up_off_alt_rounded,
+                    label: '${post.likes.length}',
+                    color: post.likes.contains(user?.uid) ? ThemeProvider.accentTeal : Colors.grey.shade600,
+                    onTap: () => communityService.toggleLike(post.id, user?.uid ?? ''),
                   ),
-              ],
+                  const SizedBox(width: 8),
+                  _ActionButton(
+                    icon: Icons.mode_comment_outlined,
+                    label: '${post.commentCount}',
+                    color: Colors.grey.shade600,
+                    onTap: () => context.push('/community/post/${post.id}'),
+                  ),
+                  const Spacer(),
+                  _ActionButton(
+                    icon: Icons.share_outlined,
+                    label: 'Share',
+                    color: Colors.grey.shade600,
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Post link copied!')));
+                    },
+                  ),
+                ],
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text(post.caption, style: GoogleFonts.inter(fontSize: 14, color: ThemeProvider.primaryNavy, height: 1.5)),
-          ),
-          const SizedBox(height: 16),
-          if (post.imageUrl != null)
-             ClipRRect(
-               borderRadius: const BorderRadius.vertical(bottom: Radius.circular(0)),
-               child: Image.network(post.imageUrl!, width: double.infinity, fit: BoxFit.cover),
-             ),
-          const Divider(height: 1),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4),
-            child: Row(
-              children: [
-                _ActionButton(
-                  icon: post.likes.contains(user?.uid) ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                  label: '${post.likes.length}',
-                  color: post.likes.contains(user?.uid) ? Colors.red : Colors.grey.shade600,
-                  onTap: () => communityService.toggleLike(post.id, user?.uid ?? ''),
-                ),
-                _ActionButton(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  label: '${post.commentCount}',
-                  color: Colors.grey.shade600,
-                  onTap: () => context.push('/community/post/${post.id}'),
-                ),
-                const Spacer(),
-                _ActionButton(
-                  icon: Icons.share_rounded,
-                  label: 'Share',
-                  color: Colors.grey.shade600,
-                  onTap: () {
-                    // In a real app, use share_plus
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unique link copied to clipboard!')));
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

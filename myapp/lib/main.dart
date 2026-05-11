@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:myapp/models/user_model.dart';
@@ -24,6 +25,15 @@ import 'package:myapp/router/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Android 15 edge-to-edge compliance
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+  ));
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -55,10 +65,8 @@ class _MyAppState extends State<MyApp> {
     _authService = AuthService();
     _appModeProvider = AppModeProvider();
     _appRouter = AppRouter(_authService, _appModeProvider);
-    // Load persisted mode after frame renders
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _appModeProvider.loadSavedMode();
-    });
+    // Mode is now restored in MainNavigationScreen._checkAutoRoute()
+    // where UserModel is available for Firestore-backed cross-device sync.
   }
 
   @override

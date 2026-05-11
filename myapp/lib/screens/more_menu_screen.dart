@@ -20,71 +20,76 @@ class MoreMenuScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-        children: [
-          if (user != null) _buildProfileHeader(context, user),
-          const SizedBox(height: 28),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 700),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+            children: [
+              if (user != null) _buildProfileHeader(context, user),
+              const SizedBox(height: 28),
 
-          _buildSectionHeader('Account'),
-          _buildMenuTile(
-            context,
-            'Edit Profile',
-            Icons.person_outline_rounded,
-            () => context.push('/profile/edit'),
-          ),
-          _buildMenuTile(
-            context,
-            'Notification Settings',
-            Icons.notifications_rounded,
-            () => context.push('/settings/notifications'),
-          ),
-          _buildMenuTile(
-            context,
-            'Account Security',
-            Icons.security_rounded,
-            () {},
-          ),
+              _buildSectionHeader('Account'),
+              _buildMenuTile(
+                context,
+                'Edit Profile',
+                Icons.person_outline_rounded,
+                () => context.push('/profile/edit'),
+              ),
+              _buildMenuTile(
+                context,
+                'Notification Settings',
+                Icons.notifications_rounded,
+                () => context.push('/settings/notifications'),
+              ),
+              _buildMenuTile(
+                context,
+                'Account Security',
+                Icons.security_rounded,
+                () {},
+              ),
 
-          const SizedBox(height: 24),
-          _buildSectionHeader('Community & Society'),
-          _buildMenuTile(
-            context,
-            'Society Selector',
-            Icons.swap_horiz_rounded,
-            () => context.push('/select-society'),
-          ),
-          _buildMenuTile(
-            context,
-            'Document Library',
-            Icons.folder_rounded,
-            () => context.push('/documents'),
-          ),
-          if (isAdmin)
-            _buildMenuTile(
-              context,
-              'Invite New Member',
-              Icons.person_add_rounded,
-              () => context.push('/society/invite'),
-              color: ThemeProvider.accentTeal,
-            ),
-          if (isAdmin)
-            _buildMenuTile(
-              context,
-              'Society Settings',
-              Icons.settings_rounded,
-              () => context.push('/society/settings'),
-              color: ThemeProvider.primaryNavy,
-            ),
+              const SizedBox(height: 24),
+              _buildSectionHeader('Community & Society'),
+              _buildMenuTile(
+                context,
+                'Switch Property Mode',
+                Icons.swap_horiz_rounded,
+                () => context.push('/select-society'),
+              ),
+              _buildMenuTile(
+                context,
+                'Document Library',
+                Icons.folder_rounded,
+                () => context.push('/documents'),
+              ),
+              if (isAdmin)
+                _buildMenuTile(
+                  context,
+                  'Invite New Member',
+                  Icons.person_add_rounded,
+                  () => context.push('/society/invite'),
+                  color: ThemeProvider.accentTeal,
+                ),
+              if (isAdmin)
+                _buildMenuTile(
+                  context,
+                  'Society Settings',
+                  Icons.settings_rounded,
+                  () => context.push('/society/settings'),
+                  color: ThemeProvider.primaryNavy,
+                ),
 
-          const SizedBox(height: 24),
-          _buildSectionHeader('Support'),
-          _buildMenuTile(context, 'Help Center', Icons.help_outline_rounded, () {}),
-          _buildMenuTile(context, 'Report an Issue', Icons.bug_report_outlined, () {}),
+              const SizedBox(height: 24),
+              _buildSectionHeader('Support'),
+              _buildMenuTile(context, 'Help Center', Icons.help_outline_rounded, () {}),
+              _buildMenuTile(context, 'Report an Issue', Icons.bug_report_outlined, () {}),
 
-          const SizedBox(height: 40),
-          _buildLogoutButton(context),
-        ],
+              const SizedBox(height: 40),
+              _buildLogoutButton(context),
+            ],
+          ),
+        ),
       ),
     );
   }

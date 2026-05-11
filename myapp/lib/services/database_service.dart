@@ -45,6 +45,16 @@ class DatabaseService {
     return _db
         .collection('properties')
         .where('ownerId', isEqualTo: ownerId)
+        .where('societyId', isNull: true) // Only standalone properties
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => PropertyModel.fromFirestore(doc)).toList());
+  }
+
+  Stream<List<PropertyModel>> getSocietyProperties(String societyId) {
+    return _db
+        .collection('properties')
+        .where('societyId', isEqualTo: societyId)
         .snapshots()
         .map((snapshot) =>
             snapshot.docs.map((doc) => PropertyModel.fromFirestore(doc)).toList());
@@ -105,15 +115,17 @@ class DatabaseService {
   }
 
   Stream<List<UnitModel>> allUnits(String ownerId) {
-    return getProperties(ownerId).switchMap((properties) {
-      if (properties.isEmpty) {
-        return Stream.value(<UnitModel>[]);
-      }
-      final unitStreams = properties.map((prop) => getUnits(prop.id));
-      return CombineLatestStream.list(unitStreams).map(
-        (listOfLists) => listOfLists.expand((units) => units).toList(),
-      );
-    });
+    return _db.collectionGroup('units')
+        .where('ownerId', isEqualTo: ownerId)
+        .snapshots()
+        .map((snap) => snap.docs.map((doc) => UnitModel.fromFirestore(doc)).toList());
+  }
+
+  Stream<List<UnitModel>> getSocietyUnits(String societyId) {
+    return _db.collectionGroup('units')
+        .where('societyId', isEqualTo: societyId)
+        .snapshots()
+        .map((snap) => snap.docs.map((doc) => UnitModel.fromFirestore(doc)).toList());
   }
 
   Stream<UnitModel> getUnitStream(String unitId, String propertyId) {

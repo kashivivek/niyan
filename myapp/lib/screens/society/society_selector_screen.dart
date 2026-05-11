@@ -6,6 +6,7 @@ import 'package:myapp/models/society_model.dart';
 import 'package:myapp/models/member_model.dart';
 import 'package:myapp/models/user_model.dart';
 import 'package:myapp/services/society_service.dart';
+import 'package:myapp/services/property_service.dart';
 import 'package:myapp/providers/app_mode_provider.dart';
 import 'package:myapp/providers/theme_provider.dart';
 
@@ -22,7 +23,6 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
   final _cityController = TextEditingController();
-  final _stateController = TextEditingController();
   bool _showCreateForm = false;
 
   @override
@@ -30,11 +30,10 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
     _nameController.dispose();
     _addressController.dispose();
     _cityController.dispose();
-    _stateController.dispose();
     super.dispose();
   }
 
-  Future<void> _createSociety(UserModel user, SocietyService societyService) async {
+  Future<void> _createSociety(UserModel user, SocietyService societyService, AppModeProvider appMode) async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isCreating = true);
     try {
@@ -42,19 +41,21 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
         name: _nameController.text.trim(),
         address: _addressController.text.trim(),
         city: _cityController.text.trim(),
-        state: _stateController.text.trim(),
         createdByUserId: user.uid,
         createdByName: user.name,
         createdByEmail: user.email,
       );
 
       if (!mounted) return;
-      final appMode = context.read<AppModeProvider>();
       final society = await societyService.getSocietyById(societyId);
       final membership = await societyService.getMember(societyId, user.uid);
-      
+
       if (society != null && membership != null) {
-        await appMode.switchToSocietyMode(society: society, membership: membership);
+        await appMode.switchToSocietyMode(
+          society: society,
+          membership: membership,
+          userId: user.uid,
+        );
         if (mounted) context.go('/');
       }
     } catch (e) {
@@ -70,14 +71,22 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
   Widget build(BuildContext context) {
     final user = Provider.of<UserModel?>(context);
     final societyService = Provider.of<SocietyService>(context, listen: false);
+    final propertyService = Provider.of<PropertyService>(context, listen: false);
     final appMode = Provider.of<AppModeProvider>(context, listen: false);
 
     if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
+    final isSocietyRole = user.currentRole == AppRole.guard ||
+        user.currentRole == AppRole.societyAdmin ||
+        user.currentRole == AppRole.superAdmin ||
+        user.currentRole == AppRole.treasurer ||
+        user.currentRole == AppRole.resident ||
+        user.currentRole == AppRole.tenant;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
-        title: Text('Switch Mode', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        title: Text('Switch Property Mode', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => context.go('/'),
@@ -85,56 +94,93 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
       ),
       body: StreamBuilder<List<SocietyModel>>(
         stream: societyService.getUserSocieties(user.uid),
-        builder: (context, snapshot) {
-          final societies = snapshot.data ?? [];
-          final canCreate = user.currentRole == AppRole.societyAdmin || societies.isEmpty;
+        builder: (context, societySnapshot) {
+          final societies = societySnapshot.data ?? [];
+          final hasSocieties = societies.isNotEmpty;
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSectionHeader('Personal Mode'),
-                _buildModeCard(
-                  title: 'Standalone Landlord',
-                  subtitle: 'Manage personal properties and tenants.',
-                  icon: Icons.person_rounded,
-                  isActive: appMode.isStandaloneMode,
-                  onTap: () async {
-                    await appMode.switchToStandaloneMode();
-                    if (context.mounted) context.go('/');
-                  },
+          return FutureBuilder<bool>(
+            future: _checkHasProperties(propertyService, user.uid),
+            builder: (context, propertySnapshot) {
+              final hasProperties = propertySnapshot.data ?? false;
+
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── STANDALONE LANDLORD SECTION ──
+                    // Show only if the user has standalone properties
+                    if (hasProperties || !isSocietyRole) ...[
+                      _buildSectionHeader('Personal Mode'),
+                      _buildModeCard(
+                        title: 'Standalone Landlord',
+                        subtitle: 'Manage personal properties and tenants.',
+                        icon: Icons.home_work_rounded,
+                        isActive: appMode.isStandaloneMode,
+                        onTap: () async {
+                          await appMode.switchToStandaloneMode(userId: user.uid);
+                          if (context.mounted) context.go('/');
+                        },
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+
+                    // ── SOCIETY ERP SECTION ──
+                    _buildSectionHeader('Society ERP Mode'),
+                    if (societies.isEmpty && !_showCreateForm)
+                      _buildSocietyEmptyState(user, isSocietyRole: isSocietyRole)
+                    else
+                      ...societies.map((s) => _buildSocietyCard(s, user, societyService, appMode)),
+
+                    const SizedBox(height: 24),
+                    if (_showCreateForm)
+                      _buildCreateForm(user, societyService, appMode)
+                    else if (user.currentRole == AppRole.societyAdmin ||
+                        user.currentRole == AppRole.superAdmin ||
+                        societies.isEmpty)
+                      _buildCreateButton()
+                    else
+                      _buildContactAdminNote(),
+
+                    // ── ADD PROPERTY PROMO (for society-only users with no properties) ──
+                    if (isSocietyRole && !hasProperties) ...[
+                      const SizedBox(height: 32),
+                      _buildStandalonePromoCard(context),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 32),
-                _buildSectionHeader('Society ERP Mode'),
-                if (societies.isEmpty && !_showCreateForm)
-                  _buildEmptyState()
-                else
-                  ...societies.map((s) => _buildSocietyCard(s, user, societyService, appMode)),
-                
-                const SizedBox(height: 24),
-                if (_showCreateForm)
-                  _buildCreateForm(user, societyService)
-                else if (canCreate)
-                  _buildCreateButton()
-                else
-                  _buildContactAdminNote(),
-              ],
-            ),
+              );
+            },
           );
         },
       ),
     );
   }
 
+  Future<bool> _checkHasProperties(PropertyService service, String uid) async {
+    try {
+      final props = await service.getProperties(uid).first;
+      return props.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Text(title, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+      child: Text(title,
+          style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
     );
   }
 
-  Widget _buildModeCard({required String title, required String subtitle, required IconData icon, required bool isActive, required VoidCallback onTap}) {
+  Widget _buildModeCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -148,7 +194,9 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: isActive ? ThemeProvider.accentTeal : Colors.grey.shade50, borderRadius: BorderRadius.circular(14)),
+              decoration: BoxDecoration(
+                  color: isActive ? ThemeProvider.accentTeal : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(14)),
               child: Icon(icon, color: isActive ? Colors.white : Colors.grey.shade400),
             ),
             const SizedBox(width: 16),
@@ -156,7 +204,8 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                  Text(title,
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
                   Text(subtitle, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
                 ],
               ),
@@ -174,7 +223,11 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
       onTap: () async {
         final membership = await service.getMember(society.id, user.uid);
         if (membership != null) {
-          await appMode.switchToSocietyMode(society: society, membership: membership);
+          await appMode.switchToSocietyMode(
+            society: society,
+            membership: membership,
+            userId: user.uid,
+          );
           if (mounted) context.go('/');
         }
       },
@@ -184,14 +237,17 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
         decoration: BoxDecoration(
           color: isActive ? ThemeProvider.accentTeal.withOpacity(0.05) : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isActive ? ThemeProvider.accentTeal : Colors.grey.shade100, width: isActive ? 2 : 1),
+          border: Border.all(
+              color: isActive ? ThemeProvider.accentTeal : Colors.grey.shade100, width: isActive ? 2 : 1),
         ),
         child: Row(
           children: [
             Container(
               width: 44,
               height: 44,
-              decoration: BoxDecoration(color: ThemeProvider.primaryNavy.withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(
+                  color: ThemeProvider.primaryNavy.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12)),
               child: const Icon(Icons.apartment_rounded, color: ThemeProvider.primaryNavy),
             ),
             const SizedBox(width: 16),
@@ -204,15 +260,17 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
                 ],
               ),
             ),
-            if (isActive) const Icon(Icons.check_circle_rounded, color: ThemeProvider.accentTeal)
-            else const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+            if (isActive)
+              const Icon(Icons.check_circle_rounded, color: ThemeProvider.accentTeal)
+            else
+              const Icon(Icons.chevron_right_rounded, color: Colors.grey),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildSocietyEmptyState(UserModel user, {required bool isSocietyRole}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(32),
@@ -221,8 +279,70 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
         children: [
           Icon(Icons.apartment_rounded, size: 64, color: Colors.grey.shade100),
           const SizedBox(height: 16),
-          Text('No Societies Linked', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.grey.shade400)),
-          Text('Join or create a society to enable ERP features.', textAlign: TextAlign.center, style: GoogleFonts.inter(color: Colors.grey.shade400, fontSize: 13)),
+          Text('No Societies Linked',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.grey.shade400)),
+          Text(
+            isSocietyRole
+                ? 'You haven\'t been added to a society yet. Contact your admin.'
+                : 'Join or create a society to enable ERP features.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(color: Colors.grey.shade400, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStandalonePromoCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [ThemeProvider.primaryNavy, ThemeProvider.primaryNavy.withOpacity(0.8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.home_work_rounded, color: ThemeProvider.accentTeal, size: 28),
+              const SizedBox(width: 12),
+              Text('Own Personal Properties?',
+                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...['Automated Rent Invoicing', 'Digital Payment Receipts', 'Tenant KYC & Documents'].map(
+            (f) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: ThemeProvider.accentTeal, size: 16),
+                  const SizedBox(width: 10),
+                  Text(f, style: GoogleFonts.inter(color: Colors.white70, fontSize: 13)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => context.go('/properties/add'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ThemeProvider.accentTeal,
+                foregroundColor: ThemeProvider.primaryNavy,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                elevation: 0,
+              ),
+              child: Text('Add a Property', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+            ),
+          ),
         ],
       ),
     );
@@ -253,16 +373,25 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
         children: [
           const Icon(Icons.info_outline_rounded, color: Colors.orange, size: 20),
           const SizedBox(width: 12),
-          Expanded(child: Text('Contact your society administrator to be invited to a community.', style: GoogleFonts.inter(fontSize: 12, color: Colors.orange.shade700))),
+          Expanded(
+            child: Text(
+              'Contact your society administrator to be invited to a community.',
+              style: GoogleFonts.inter(fontSize: 12, color: Colors.orange.shade700),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildCreateForm(UserModel user, SocietyService service) {
+  Widget _buildCreateForm(UserModel user, SocietyService service, AppModeProvider appMode) {
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), border: Border.all(color: ThemeProvider.accentTeal.withOpacity(0.3))),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: ThemeProvider.accentTeal.withOpacity(0.3)),
+      ),
       child: Form(
         key: _formKey,
         child: Column(
@@ -270,12 +399,15 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Register Society', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(Icons.close), onPressed: () => setState(() => _showCreateForm = false)),
+                Text('Register Society',
+                    style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
+                IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => setState(() => _showCreateForm = false)),
               ],
             ),
             const SizedBox(height: 16),
-            _buildField(_nameController, 'Name'),
+            _buildField(_nameController, 'Society Name'),
             const SizedBox(height: 12),
             _buildField(_addressController, 'Address'),
             const SizedBox(height: 12),
@@ -285,8 +417,10 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
-                onPressed: _isCreating ? null : () => _createSociety(user, service),
-                child: _isCreating ? const CircularProgressIndicator(color: Colors.white) : const Text('CREATE SOCIETY'),
+                onPressed: _isCreating ? null : () => _createSociety(user, service, appMode),
+                child: _isCreating
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('CREATE SOCIETY'),
               ),
             ),
           ],
@@ -298,7 +432,8 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
   Widget _buildField(TextEditingController ctrl, String label) {
     return TextFormField(
       controller: ctrl,
-      decoration: InputDecoration(labelText: label, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+      decoration: InputDecoration(
+          labelText: label, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
       validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
     );
   }

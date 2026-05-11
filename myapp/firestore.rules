@@ -40,12 +40,7 @@ service cloud.firestore {
          getMemberRole(societyId) == 'SocietyRole.committee');
     }
 
-    // Check if user is a resident (owner or tenant)
-    function isResident(societyId) {
-      return isMember(societyId) &&
-        (getMemberRole(societyId) == 'SocietyRole.owner' ||
-         getMemberRole(societyId) == 'SocietyRole.tenant');
-    }
+    // ───────────────────────────────────────────────
 
     // ─────────────────────────────────────────────────────────
     // Users collection

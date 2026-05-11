@@ -21,51 +21,67 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   bool _isAutoRouting = false;
+  bool _hasRestoredMode = false;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkAutoRoute();
-    });
-  }
   Future<void> _checkAutoRoute() async {
-    if (_isAutoRouting) return;
-    
+    if (_isAutoRouting || _hasRestoredMode) return;
+
     final user = Provider.of<UserModel?>(context, listen: false);
     final appMode = Provider.of<AppModeProvider>(context, listen: false);
 
     if (user == null) return;
+    _hasRestoredMode = true;
 
-    // Restore society context if it's missing but we have an ID
-    if (appMode.activeSociety == null && user.activeSocietyId != null) {
-      final sid = user.activeSocietyId!;
-      final savedModeId = await appMode.getPersistedSocietyId();
-      
-      // Determine if we should be in society mode
-      final isGuardOrAdmin = user.currentRole == AppRole.guard || user.currentRole == AppRole.societyAdmin;
-      final wasInSocietyMode = savedModeId != null || appMode.isSocietyMode;
-      
-      if (isGuardOrAdmin || wasInSocietyMode) {
-        if (mounted) setState(() => _isAutoRouting = true);
-        try {
-          final society = await SocietyService().getSocietyById(sid);
-          final membership = await SocietyService().getMembership(sid, user.uid);
-          
-          if (society != null && membership != null) {
-            await appMode.switchToSocietyMode(society: society, membership: membership);
-          }
-        } finally {
-          if (mounted) setState(() => _isAutoRouting = false);
+    // Step 1: Load the user's last-used mode from Firestore (via UserModel)
+    await appMode.loadSavedMode(user: user);
+
+    // Step 2: If the persisted mode is society (or role demands it), 
+    // restore the active society context.
+    final savedSocietyId = user.activeSocietyId ?? await appMode.getPersistedSocietyId();
+    
+    final isSocietyRole = user.currentRole == AppRole.guard ||
+        user.currentRole == AppRole.societyAdmin ||
+        user.currentRole == AppRole.superAdmin ||
+        user.currentRole == AppRole.treasurer ||
+        user.currentRole == AppRole.resident ||
+        user.currentRole == AppRole.tenant;
+
+    final shouldBeSocietyMode = appMode.isSocietyMode || isSocietyRole;
+
+    if (shouldBeSocietyMode && savedSocietyId != null && appMode.activeSociety == null) {
+      if (mounted) setState(() => _isAutoRouting = true);
+      try {
+        final society = await SocietyService().getSocietyById(savedSocietyId);
+        final membership = await SocietyService().getMembership(savedSocietyId, user.uid);
+
+        if (society != null && membership != null) {
+          await appMode.switchToSocietyMode(
+            society: society,
+            membership: membership,
+            userId: user.uid,
+          );
         }
+      } finally {
+        if (mounted) setState(() => _isAutoRouting = false);
       }
     }
   }
 
+  void _showContextSwitcher(BuildContext context) {
+    context.push('/select-society');
+  }
+
   @override
   Widget build(BuildContext context) {
-    final appMode = Provider.of<AppModeProvider>(context);
     final user = Provider.of<UserModel?>(context);
+    final appMode = Provider.of<AppModeProvider>(context);
+
+    // Auto-restore session context once user profile is loaded
+    if (user != null && !_hasRestoredMode && !_isAutoRouting) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkAutoRoute();
+      });
+    }
 
     if (_isAutoRouting) {
       return const Scaffold(
@@ -236,10 +252,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
-  void _showContextSwitcher(BuildContext context) {
-    // This will be implemented to allow switching between properties/societies
-    context.push('/profile');
-  }
 
   Widget _buildGlassmorphicNavBar() {
     final appMode = Provider.of<AppModeProvider>(context);

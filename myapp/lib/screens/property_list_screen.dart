@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:myapp/models/property_model.dart';
+import 'package:myapp/models/unit_model.dart';
 import 'package:myapp/services/database_service.dart';
 import 'package:myapp/services/auth_service.dart';
 import 'package:myapp/providers/theme_provider.dart';
@@ -32,7 +33,10 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
-      body: Column(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: isDesktop ? 960 : double.infinity),
+          child: Column(
         children: [
           // View Mode Toggle
           Padding(
@@ -59,6 +63,8 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
               : _buildUnitsGrid(db, user.uid, isDesktop),
           ),
         ],
+      ),
+      ),
       ),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 90),
@@ -104,8 +110,13 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
   }
 
   Widget _buildPropertiesGrid(DatabaseService db, String userId, bool isDesktop) {
+    final appMode = Provider.of<AppModeProvider>(context, listen: false);
+    final stream = appMode.isSocietyMode && appMode.activeSociety != null
+        ? db.getSocietyProperties(appMode.activeSociety!.id)
+        : db.getProperties(userId);
+
     return StreamBuilder<List<PropertyModel>>(
-      stream: db.getProperties(userId),
+      stream: stream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
         final properties = snapshot.data ?? [];
@@ -127,37 +138,36 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
   }
 
   Widget _buildUnitsGrid(DatabaseService db, String userId, bool isDesktop) {
-    // Note: We need a stream of all units for the user. 
-    // For now, let's assume DatabaseService has getAllUnitsForUser or similar.
-    return StreamBuilder<List<PropertyModel>>(
-      stream: db.getProperties(userId),
+    final appMode = Provider.of<AppModeProvider>(context, listen: false);
+    final stream = appMode.isSocietyMode && appMode.activeSociety != null
+        ? db.getSocietyUnits(appMode.activeSociety!.id)
+        : db.allUnits(userId);
+
+    return StreamBuilder<List<UnitModel>>(
+      stream: stream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        final properties = snapshot.data ?? [];
+        final units = snapshot.data ?? [];
         
-        // This is a simplified approach: flatten units from all properties
-        // In a real app, you'd have a separate collection or more efficient query
-        return FutureBuilder<List<Map<String, dynamic>>>(
-          future: _fetchAllUnits(db, properties),
-          builder: (context, unitSnap) {
-            if (unitSnap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-            final units = unitSnap.data ?? [];
-            if (units.isEmpty) return _buildEmptyState('No units found');
+        if (units.isEmpty) return _buildEmptyState('No units found');
 
-            return GridView.builder(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: isDesktop ? 4 : 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 1,
-              ),
-              itemCount: units.length,
-              itemBuilder: (context, index) {
-                final unit = units[index];
-                return _UnitGridCard(unit: unit);
-              },
-            );
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: isDesktop ? 4 : 2,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 1,
+          ),
+          itemCount: units.length,
+          itemBuilder: (context, index) {
+            final u = units[index];
+            return _UnitGridCard(unit: {
+              'unit': u,
+              'propertyName': 'Property', // Ideally fetched or stored in unit
+              'propertyId': u.propertyId,
+              'propertyAddress': 'Address',
+            });
           },
         );
       },

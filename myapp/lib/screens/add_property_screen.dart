@@ -5,6 +5,7 @@ import 'package:myapp/services/auth_service.dart';
 import 'package:myapp/services/database_service.dart';
 import 'package:myapp/widgets/responsive_centered.dart';
 import 'package:myapp/providers/theme_provider.dart';
+import 'package:myapp/providers/app_mode_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AddPropertyScreen extends StatefulWidget {
@@ -37,6 +38,7 @@ class AddPropertyScreenState extends State<AddPropertyScreen> {
     }
 
     final authService = context.read<AuthService>();
+    final appMode = context.read<AppModeProvider>();
     final user = await authService.user.first;
 
     if (!mounted || user == null) return;
@@ -49,6 +51,7 @@ class AddPropertyScreenState extends State<AddPropertyScreen> {
       imageUrl: _imageUrlController.text,
       type: _selectedType,
       ownerId: user.uid,
+      societyId: appMode.isSocietyMode ? appMode.activeSociety?.id : null,
     );
 
     await context.read<DatabaseService>().addProperty(propertyToSave);

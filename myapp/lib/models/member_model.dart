@@ -19,11 +19,11 @@ extension SocietyRoleExtension on SocietyRole {
       case SocietyRole.admin:
         return 'Admin';
       case SocietyRole.committee:
-        return 'Committee Member';
+        return 'Society Manager';
       case SocietyRole.owner:
-        return 'Owner';
+        return 'Unit Owner';
       case SocietyRole.tenant:
-        return 'Tenant';
+        return 'Unit Resident';
       case SocietyRole.guard:
         return 'Security Guard';
     }
@@ -42,6 +42,12 @@ extension SocietyRoleExtension on SocietyRole {
   /// Whether this role represents a resident (owner or tenant).
   bool get isResident =>
       this == SocietyRole.owner || this == SocietyRole.tenant;
+
+  /// Whether this role is a Unit Owner specifically.
+  bool get isUnitOwner => this == SocietyRole.owner;
+
+  /// Whether this role is a Unit Resident (Tenant) specifically.
+  bool get isUnitResident => this == SocietyRole.tenant;
 
   /// Whether this role can vote in society polls.
   bool get canVote => this == SocietyRole.owner;

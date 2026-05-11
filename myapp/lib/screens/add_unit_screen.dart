@@ -6,6 +6,7 @@ import '../services/database_service.dart';
 import '../services/auth_service.dart';
 import '../models/property_model.dart';
 import 'package:myapp/widgets/responsive_centered.dart';
+import 'package:myapp/providers/app_mode_provider.dart';
 
 class AddUnitScreen extends StatefulWidget {
   final String propertyId;
@@ -31,6 +32,7 @@ class _AddUnitScreenState extends State<AddUnitScreen> {
       final ownerId = context.read<AuthService>().currentUser?.uid;
       if (ownerId == null) return;
 
+      final appMode = context.read<AppModeProvider>();
       final newUnit = UnitModel(
         id: '',
         propertyId: widget.propertyId,
@@ -41,6 +43,7 @@ class _AddUnitScreenState extends State<AddUnitScreen> {
         bedrooms: _bedrooms,
         bathrooms: _bathrooms,
         rentDueDate: _rentDueDate,
+        societyId: appMode.isSocietyMode ? appMode.activeSociety?.id : widget.property?.societyId,
       );
 
       context.read<DatabaseService>().addUnit(newUnit, ownerId).then((_) {
