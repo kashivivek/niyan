@@ -84,7 +84,7 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
         user.currentRole == AppRole.tenant;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Switch Property Mode', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
         leading: IconButton(
@@ -170,7 +170,7 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(title,
-          style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+          style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
     );
   }
 
@@ -205,7 +205,7 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
-                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                   Text(subtitle, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
                 ],
               ),
@@ -248,7 +248,7 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
               decoration: BoxDecoration(
                   color: ThemeProvider.primaryNavy.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(12)),
-              child: const Icon(Icons.apartment_rounded, color: ThemeProvider.primaryNavy),
+              child: Icon(Icons.apartment_rounded, color: Theme.of(context).colorScheme.primary),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -274,7 +274,7 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(24)),
       child: Column(
         children: [
           Icon(Icons.apartment_rounded, size: 64, color: Colors.grey.shade100),
@@ -312,7 +312,7 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
               const Icon(Icons.home_work_rounded, color: ThemeProvider.accentTeal, size: 28),
               const SizedBox(width: 12),
               Text('Own Personal Properties?',
-                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold, fontSize: 16)),
             ],
           ),
           const SizedBox(height: 16),
@@ -388,7 +388,7 @@ class _SocietySelectorScreenState extends State<SocietySelectorScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: ThemeProvider.accentTeal.withOpacity(0.3)),
       ),

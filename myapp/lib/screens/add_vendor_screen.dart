@@ -83,7 +83,7 @@ class _AddVendorScreenState extends State<AddVendorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Add Vendor', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
         actions: [

@@ -32,17 +32,17 @@ class _VendorDirectoryScreenState extends State<VendorDirectoryScreen> {
         : vendorService.getVendorsBySociety(appMode.activeSociety?.id ?? '');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Vendors',
             style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/vendors/add'),
-        backgroundColor: ThemeProvider.accentBlue,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark ? ThemeProvider.accentTeal : ThemeProvider.accentBlue,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
         label: Text('Add Vendor',
-            style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600)),
+            style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontWeight: FontWeight.w600)),
       ),
       body: StreamBuilder<List<VendorModel>>(
         stream: stream,
@@ -197,7 +197,7 @@ class _VendorCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: Colors.grey.shade100),
           boxShadow: [
@@ -231,7 +231,7 @@ class _VendorCard extends StatelessWidget {
                       style: GoogleFonts.outfit(
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
-                          color: ThemeProvider.primaryNavy)),
+                          color: Theme.of(context).colorScheme.primary)),
                   const SizedBox(height: 2),
                   Text(vendor.category.label,
                       style: GoogleFonts.inter(
@@ -263,7 +263,7 @@ class _VendorCard extends StatelessWidget {
                           style: GoogleFonts.outfit(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: ThemeProvider.primaryNavy)),
+                              color: Theme.of(context).colorScheme.primary)),
                     ],
                   ),
                   const SizedBox(height: 4),

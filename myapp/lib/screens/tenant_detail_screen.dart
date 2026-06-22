@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:myapp/models/property_model.dart';
 import 'package:myapp/models/rent_status.dart';
 import 'package:myapp/models/tenant_model.dart';
 import 'package:myapp/models/user_model.dart';
@@ -10,6 +11,7 @@ import 'package:myapp/screens/edit_tenant_screen.dart';
 import 'package:myapp/providers/theme_provider.dart';
 import 'package:myapp/utils/currency_helper.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class TenantDetailScreen extends StatelessWidget {
   final TenantModel? tenant;
@@ -83,7 +85,7 @@ class TenantDetailScreen extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15, offset: const Offset(0, 5))],
       ),
@@ -131,7 +133,7 @@ class TenantDetailScreen extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15, offset: const Offset(0, 5))],
           ),
@@ -162,7 +164,7 @@ class TenantDetailScreen extends StatelessWidget {
           children: [
             Icon(icon, size: 16, color: color),
             const SizedBox(width: 8),
-            Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 11, fontWeight: FontWeight.bold)),
+            Text(label, style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
           ],
         ),
         const SizedBox(height: 4),
@@ -175,7 +177,7 @@ class TenantDetailScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15, offset: const Offset(0, 5))],
       ),
@@ -184,15 +186,86 @@ class TenantDetailScreen extends StatelessWidget {
         children: [
           const Text('Contact Information', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 24),
-          _buildInfoRow(Icons.phone_outlined, tenant.phoneNumber ?? 'No phone number'),
+          // Phone — tappable to call
+          _buildPhoneRow(context, tenant.phoneNumber),
           const Divider(height: 32),
           _buildInfoRow(Icons.email_outlined, tenant.email ?? 'No email'),
           if (tenant.isAssignedToUnit) ...[
             const Divider(height: 32),
-            _buildInfoRow(Icons.home_work_outlined, 'Assigned to Unit ${tenant.assignedUnitId}'),
+            _buildUnitRow(context, tenant),
           ]
         ],
       ),
+    );
+  }
+
+  Widget _buildPhoneRow(BuildContext context, String? phone) {
+    final hasPhone = phone != null && phone.isNotEmpty;
+    return GestureDetector(
+      onTap: hasPhone
+          ? () async {
+              final uri = Uri(scheme: 'tel', path: phone);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri);
+              }
+            }
+          : null,
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: hasPhone
+                  ? Colors.green.withOpacity(0.1)
+                  : ThemeProvider.accentBlue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.phone_outlined,
+              color: hasPhone ? Colors.green.shade700 : ThemeProvider.accentBlue,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  hasPhone ? phone! : 'No phone number',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: hasPhone ? Colors.green.shade800 : Colors.grey.shade600,
+                    fontWeight: hasPhone ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+                if (hasPhone)
+                  Text(
+                    'Tap to call',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                  ),
+              ],
+            ),
+          ),
+          if (hasPhone)
+            Icon(Icons.call_rounded, color: Colors.green.shade600, size: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUnitRow(BuildContext context, TenantModel tenant) {
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    if (tenant.propertyId.isEmpty) {
+      return _buildInfoRow(Icons.home_work_outlined, 'Unit: ${tenant.assignedUnitId}');
+    }
+    return StreamBuilder<PropertyModel>(
+      stream: databaseService.getPropertyStream(tenant.propertyId),
+      builder: (context, snapshot) {
+        final propertyName = snapshot.data?.name ?? tenant.propertyId;
+        final label = '$propertyName  ·  Unit: ${tenant.assignedUnitId}';
+        return _buildInfoRow(Icons.home_work_outlined, label);
+      },
     );
   }
 

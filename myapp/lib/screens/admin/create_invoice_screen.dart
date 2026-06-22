@@ -37,7 +37,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
       appBar: AppBar(title: const Text('New Invoice')),
       body: ResponsiveCentered(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

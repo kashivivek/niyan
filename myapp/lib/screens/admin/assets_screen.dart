@@ -17,7 +17,7 @@ class AssetsScreen extends StatelessWidget {
     if (society == null) return const Scaffold(body: Center(child: Text('No Society Selected')));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Asset Tracking', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
       ),
@@ -46,9 +46,9 @@ class AssetsScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddAssetSheet(context, society.id),
-        backgroundColor: ThemeProvider.accentBlue,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark ? ThemeProvider.accentTeal : ThemeProvider.accentBlue,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text('Add Asset', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+        label: Text('Add Asset', style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold)),
       ),
     );
   }
@@ -93,7 +93,7 @@ class _AssetCardState extends State<_AssetCard> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: Colors.grey.shade100, width: 1.5),
+        side: BorderSide(color: Theme.of(context).dividerColor, width: 1.5),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -115,7 +115,7 @@ class _AssetCardState extends State<_AssetCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(asset.name, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18, color: ThemeProvider.primaryNavy)),
+                      Text(asset.name, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18, color: Theme.of(context).colorScheme.primary)),
                       Text('${asset.category} · ${asset.location ?? 'Unknown location'}', style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade500)),
                     ],
                   ),
@@ -241,7 +241,7 @@ class _AddAssetSheetState extends State<_AddAssetSheet> {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
-      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

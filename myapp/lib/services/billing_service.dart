@@ -95,9 +95,11 @@ class BillingService {
       for (final monthDate in monthsToCheck) {
         final monthStr = DateFormat('yyyy-MM').format(monthDate);
 
-        final moveInMonth =
-            DateTime(tenant.moveInDate.year, tenant.moveInDate.month, 1);
-        if (monthDate.isBefore(moveInMonth)) continue;
+        final trackingStartDate = tenant.rentTrackingStartDate ?? tenant.moveInDate;
+
+        // Skip if month is before tracking start month
+        final trackingStartMonth = DateTime(trackingStartDate.year, trackingStartDate.month, 1);
+        if (monthDate.isBefore(trackingStartMonth)) continue;
 
         final daysInMonth =
             DateUtils.getDaysInMonth(monthDate.year, monthDate.month);
@@ -107,6 +109,14 @@ class BillingService {
         final dueDate =
             DateTime(monthDate.year, monthDate.month, clampedDay);
 
+        // Skip standard rent for tracking start month if the due date is before tracking start date
+        if (monthDate.year == trackingStartDate.year && monthDate.month == trackingStartDate.month) {
+          if (dueDate.isBefore(trackingStartDate)) {
+            developer.log('Skipping standard rent for $monthStr because due date $dueDate is before tracking start date $trackingStartDate');
+            continue;
+          }
+        }
+
         if (today.add(const Duration(days: 7)).isAfter(dueDate) ||
             today.isAfter(dueDate)) {
           final query = await _db
@@ -114,11 +124,15 @@ class BillingService {
               .where('unitId', isEqualTo: unit.id)
               .where('tenantId', isEqualTo: tenant.id)
               .where('month', isEqualTo: monthStr)
-              .where('title', isEqualTo: 'Monthly Rent')
-              .limit(1)
               .get();
 
-          if (query.docs.isEmpty) {
+          // Do not generate standard rent if any rent record (Monthly Rent or Prorated Rent) already exists for this month
+          final hasRentRecord = query.docs.any((doc) {
+            final t = doc.data()['title'] as String?;
+            return t == 'Monthly Rent' || t == 'Prorated Rent';
+          });
+
+          if (!hasRentRecord) {
             developer
                 .log('Creating rent record for ${tenant.name} - $monthStr');
             final ref = _db.collection('rentRecords').doc();

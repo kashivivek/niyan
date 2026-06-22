@@ -21,7 +21,7 @@ class ParkingManagementScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Parking Management', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
       ),
@@ -72,7 +72,7 @@ class _ParkingSpotCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade100),
       ),
@@ -94,7 +94,7 @@ class _ParkingSpotCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${spot.blockOrLevel} - ${spot.spotNumber}', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                Text('${spot.blockOrLevel} - ${spot.spotNumber}', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                 if (spot.assignedResidentName != null) ...[
                   const SizedBox(height: 4),
                   Text('Assigned to: ${spot.assignedResidentName}', style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600)),

@@ -25,6 +25,7 @@ class ThemeProvider with ChangeNotifier {
   static final ThemeData lightTheme = ThemeData(
     brightness: Brightness.light,
     scaffoldBackgroundColor: backgroundLight,
+    cardColor: cardLight,
     primaryColor: primaryNavy,
     colorScheme: const ColorScheme.light(
       primary: primaryNavy,
@@ -48,6 +49,10 @@ class ThemeProvider with ChangeNotifier {
       titleLarge: GoogleFonts.outfit(fontWeight: FontWeight.w600, color: primaryNavy),
       bodyLarge: GoogleFonts.inter(color: Colors.black87),
       bodyMedium: GoogleFonts.inter(color: Colors.black54),
+    ),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: primaryNavy,
+      foregroundColor: Colors.white,
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
@@ -88,6 +93,7 @@ class ThemeProvider with ChangeNotifier {
   static final ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,
     scaffoldBackgroundColor: const Color(0xFF0B1426),
+    cardColor: const Color(0xFF1E293B),
     primaryColor: Colors.white,
     colorScheme: const ColorScheme.dark(
       primary: Colors.white,
@@ -111,6 +117,7 @@ class ThemeProvider with ChangeNotifier {
       bodyLarge: GoogleFonts.inter(color: Colors.white70),
       bodyMedium: GoogleFonts.inter(color: Colors.white60),
     ),
+
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: accentTeal,
@@ -123,12 +130,23 @@ class ThemeProvider with ChangeNotifier {
         ),
       ),
     ),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: accentTeal,
+      foregroundColor: Colors.white,
+    ),
     cardTheme: CardThemeData(
       color: const Color(0xFF1E293B),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
+    ),
+    bottomNavigationBarTheme: BottomNavigationBarThemeData(
+      backgroundColor: const Color(0xFF0B1426),
+      selectedItemColor: accentTeal,
+      unselectedItemColor: Colors.grey.shade600,
+      showUnselectedLabels: true,
+      type: BottomNavigationBarType.fixed,
     ),
   );
 }

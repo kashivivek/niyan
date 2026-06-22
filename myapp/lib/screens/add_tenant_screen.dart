@@ -12,7 +12,9 @@ import 'package:flutter/foundation.dart';
 import 'dart:io' as io;
 
 class AddTenantScreen extends StatefulWidget {
-  const AddTenantScreen({super.key});
+  final String? propertyId;
+  final String? unitId;
+  const AddTenantScreen({super.key, this.propertyId, this.unitId});
 
   @override
   AddTenantScreenState createState() => AddTenantScreenState();
@@ -25,6 +27,7 @@ class AddTenantScreenState extends State<AddTenantScreen> {
   final _altPhoneController = TextEditingController();
   final _depositController = TextEditingController(text: '0.0');
   DateTime? _moveInDate;
+  DateTime? _rentTrackingStartDate;
   XFile? _image;
   final ImagePicker _picker = ImagePicker();
 
@@ -47,6 +50,21 @@ class AddTenantScreenState extends State<AddTenantScreen> {
     if (picked != null) {
       setState(() {
         _moveInDate = picked;
+        _rentTrackingStartDate ??= picked;
+      });
+    }
+  }
+
+  Future<void> _selectTrackingDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _rentTrackingStartDate ?? _moveInDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null) {
+      setState(() {
+        _rentTrackingStartDate = picked;
       });
     }
   }
@@ -81,6 +99,7 @@ class AddTenantScreenState extends State<AddTenantScreen> {
         propertyId: '',
         assignedUnitId: '',
         securityDeposit: double.tryParse(_depositController.text) ?? 0.0,
+        rentTrackingStartDate: _rentTrackingStartDate ?? _moveInDate,
       );
 
       try {
@@ -94,6 +113,15 @@ class AddTenantScreenState extends State<AddTenantScreen> {
           if (imageUrl != null) {
             await databaseService.updateTenantPhotoUrl(tenantRef.id, imageUrl);
           }
+        }
+
+        if (widget.propertyId != null && widget.unitId != null) {
+          await databaseService.assignTenantToUnit(
+            unitId: widget.unitId!,
+            tenantId: tenantRef.id,
+            propertyId: widget.propertyId!,
+            ownerId: user.uid,
+          );
         }
 
         if (mounted) {
@@ -184,6 +212,15 @@ class AddTenantScreenState extends State<AddTenantScreen> {
                       : DateFormat('MMM dd, yyyy').format(_moveInDate!)),
                   trailing: const Icon(Icons.calendar_today),
                   onTap: () => _selectDate(context),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  title: const Text('Start Rent Tracking From'),
+                  subtitle: Text(_rentTrackingStartDate == null
+                      ? 'Same as Move-In Date'
+                      : DateFormat('MMM dd, yyyy').format(_rentTrackingStartDate!)),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () => _selectTrackingDate(context),
                 ),
                 const SizedBox(height: 32),
                 ElevatedButton(

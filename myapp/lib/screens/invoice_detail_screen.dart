@@ -93,7 +93,7 @@ class _InvoiceDetailBodyState extends State<_InvoiceDetailBody> {
               ListTile(
                 title: Text(method, style: GoogleFonts.inter()),
                 onTap: () => Navigator.pop(ctx, method),
-                leading: const Icon(Icons.payment_outlined),
+                leading: Icon(Icons.payment_outlined),
               ),
           ],
         ),
@@ -110,21 +110,21 @@ class _InvoiceDetailBodyState extends State<_InvoiceDetailBody> {
     final isOverdue = inv.isOverdue;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Invoice', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
         actions: [
           if (!isPaid)
             TextButton.icon(
               onPressed: _isProcessing ? null : _markPaid,
-              icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+              icon: Icon(Icons.check_circle_outline_rounded, size: 18),
               label: Text('Mark Paid', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
               style: TextButton.styleFrom(foregroundColor: Colors.green.shade700),
             ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -152,9 +152,9 @@ class _InvoiceDetailBodyState extends State<_InvoiceDetailBody> {
               const SizedBox(height: 10),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(14),
+                padding: EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.grey.shade100),
                 ),
@@ -177,7 +177,7 @@ class _InvoiceDetailBodyState extends State<_InvoiceDetailBody> {
     final statusLabel = isPaid ? 'Paid' : isOverdue ? 'Overdue' : inv.status.toString().split('.').last;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [ThemeProvider.primaryNavy, const Color(0xFF3D3D4F)],
@@ -204,7 +204,7 @@ class _InvoiceDetailBodyState extends State<_InvoiceDetailBody> {
                   children: [
                     Text(inv.residentName,
                         style: GoogleFonts.outfit(
-                            color: Colors.white,
+                            color: Theme.of(context).cardColor,
                             fontWeight: FontWeight.bold,
                             fontSize: 20)),
                     const SizedBox(height: 4),
@@ -215,7 +215,7 @@ class _InvoiceDetailBodyState extends State<_InvoiceDetailBody> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
@@ -236,7 +236,7 @@ class _InvoiceDetailBodyState extends State<_InvoiceDetailBody> {
           Text(
             CurrencyHelper.format(inv.grandTotal, currency),
             style: GoogleFonts.outfit(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 fontWeight: FontWeight.bold,
                 fontSize: 34),
           ),
@@ -258,7 +258,7 @@ class _InvoiceDetailBodyState extends State<_InvoiceDetailBody> {
   Widget _buildLineItems(InvoiceModel inv, String currency) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.grey.shade100),
       ),
@@ -275,7 +275,7 @@ class _InvoiceDetailBodyState extends State<_InvoiceDetailBody> {
 
   Widget _buildLineItemRow(InvoiceLineItem item, String currency) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
           Expanded(
@@ -286,7 +286,7 @@ class _InvoiceDetailBodyState extends State<_InvoiceDetailBody> {
                     style: GoogleFonts.outfit(
                         fontWeight: FontWeight.w500,
                         fontSize: 14,
-                        color: ThemeProvider.primaryNavy)),
+                        color: Theme.of(context).colorScheme.primary)),
                 const SizedBox(height: 2),
                 Text(item.category.label,
                     style: GoogleFonts.inter(
@@ -305,7 +305,7 @@ class _InvoiceDetailBodyState extends State<_InvoiceDetailBody> {
             style: GoogleFonts.outfit(
                 fontWeight: FontWeight.w600,
                 fontSize: 15,
-                color: ThemeProvider.primaryNavy),
+                color: Theme.of(context).colorScheme.primary),
           ),
         ],
       ),
@@ -314,9 +314,9 @@ class _InvoiceDetailBodyState extends State<_InvoiceDetailBody> {
 
   Widget _buildTotalsCard(InvoiceModel inv, String currency) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.grey.shade100),
       ),
@@ -359,7 +359,7 @@ class _InvoiceDetailBodyState extends State<_InvoiceDetailBody> {
 
   Widget _buildPaymentDetails(InvoiceModel inv) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.green.shade50,
         borderRadius: BorderRadius.circular(14),

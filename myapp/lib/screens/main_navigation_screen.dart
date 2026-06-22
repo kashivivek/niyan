@@ -4,12 +4,16 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:myapp/models/user_model.dart';
+import 'package:myapp/models/notification_model.dart';
 import 'package:myapp/providers/app_mode_provider.dart';
 import 'package:myapp/providers/theme_provider.dart';
 import 'package:myapp/services/society_service.dart';
+import 'package:myapp/services/database_service.dart';
 import 'package:myapp/models/sos_model.dart';
 import 'package:myapp/services/sos_service.dart';
 import 'package:myapp/widgets/responsive_layout.dart';
+import 'package:myapp/l10n/generated/app_localizations.dart';
+import 'package:flutter_app_badger/flutter_app_badger.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final Widget child;
@@ -84,22 +88,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     }
 
     if (_isAutoRouting) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(color: ThemeProvider.accentTeal),
-              SizedBox(height: 16),
-              Text('Switching to Society Mode...', style: TextStyle(color: ThemeProvider.primaryNavy, fontWeight: FontWeight.bold)),
+              const CircularProgressIndicator(color: ThemeProvider.accentTeal),
+              const SizedBox(height: 16),
+              Text('Switching to Society Mode...', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
             ],
           ),
         ),
       );
     }
 
+    final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         bottom: false,
         child: Stack(
@@ -114,12 +120,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
               ],
             ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: _buildGlassmorphicNavBar(),
-            ),
+            if (!isKeyboardOpen)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildGlassmorphicNavBar(),
+              ),
           ],
         ),
       ),
@@ -147,13 +154,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 24),
+              Icon(Icons.warning_amber_rounded, color: Theme.of(context).cardColor, size: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('SOS ACTIVE: ${alert.residentName}', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text('SOS ACTIVE: ${alert.residentName}', style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold, fontSize: 14)),
                     Text(
                       alert.unitNumber.isNotEmpty 
                         ? 'Unit ${alert.unitNumber} needs assistance.'
@@ -180,16 +187,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final canPop = GoRouter.of(context).canPop();
     final isDashboard = location == '/' || location == '/dashboard';
     
-    String title = 'Home';
-    if (location.startsWith('/properties')) title = 'Properties';
-    if (location.startsWith('/tenants')) title = 'Tenants';
-    if (location.startsWith('/transactions')) title = 'Finance';
-    if (location.startsWith('/more')) title = 'Settings';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final headerColor = isDark ? Colors.white : ThemeProvider.primaryNavy;
+    
+    String title = AppLocalizations.of(context)?.home ?? 'Home';
+    if (location.startsWith('/properties')) title = AppLocalizations.of(context)?.properties ?? 'Properties';
+    if (location.startsWith('/tenants')) title = AppLocalizations.of(context)?.tenants ?? 'Tenants';
+    if (location.startsWith('/transactions')) title = AppLocalizations.of(context)?.finance ?? 'Finance';
+    if (location.startsWith('/notifications')) title = AppLocalizations.of(context)?.alerts ?? 'Alerts';
+    if (location.startsWith('/more')) title = AppLocalizations.of(context)?.settings ?? 'Settings';
     if (location.startsWith('/gate')) title = 'Gate Control';
     if (location.startsWith('/notices')) title = 'Society Notices';
     if (location.startsWith('/community')) title = 'Community';
     if (location.startsWith('/profile')) title = 'Profile';
-
+ 
     return Container(
       height: 60,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -201,7 +212,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             alignment: Alignment.centerLeft,
             child: (!isDashboard && canPop)
                 ? IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: ThemeProvider.primaryNavy),
+                    icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: headerColor),
                     onPressed: () => context.pop(),
                   )
                 : Image.asset(
@@ -212,7 +223,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       style: GoogleFonts.outfit(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: ThemeProvider.primaryNavy,
+                        color: headerColor,
                       ),
                     ),
                   ),
@@ -224,26 +235,36 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             style: GoogleFonts.outfit(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: ThemeProvider.primaryNavy.withOpacity(0.8),
+              color: headerColor.withOpacity(0.8),
             ),
           ),
           
-          // Top Right: Profile Icon
+          // Top Right: Profile Avatar (with photo or icon fallback)
           Align(
             alignment: Alignment.centerRight,
             child: GestureDetector(
-              onTap: () => _showContextSwitcher(context),
+              onTap: () => context.go('/more'),
               child: Container(
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: ThemeProvider.accentTeal.withOpacity(0.2), width: 1.5),
+                  border: Border.all(color: ThemeProvider.accentTeal.withOpacity(0.4), width: 1.5),
                 ),
-                child: CircleAvatar(
-                  radius: 14,
-                  backgroundColor: ThemeProvider.accentTeal.withOpacity(0.05),
-                  child: const Icon(Icons.person_rounded, size: 16, color: ThemeProvider.accentTeal),
-                ),
+                child: Builder(builder: (ctx) {
+                  final u = Provider.of<UserModel?>(ctx);
+                  if (u?.photoUrl != null && u!.photoUrl!.isNotEmpty) {
+                    return CircleAvatar(
+                      radius: 14,
+                      backgroundImage: NetworkImage(u.photoUrl!),
+                      onBackgroundImageError: (_, __) {},
+                    );
+                  }
+                  return CircleAvatar(
+                    radius: 14,
+                    backgroundColor: ThemeProvider.accentTeal.withOpacity(0.1),
+                    child: const Icon(Icons.person_rounded, size: 16, color: ThemeProvider.accentTeal),
+                  );
+                }),
               ),
             ),
           ),
@@ -255,91 +276,167 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   Widget _buildGlassmorphicNavBar() {
     final appMode = Provider.of<AppModeProvider>(context);
+    final user = Provider.of<UserModel?>(context);
     final items = _getNavItems(appMode.mode);
     final currentLocation = GoRouterState.of(context).matchedLocation;
-    
+
     int selectedIndex = items.indexWhere((item) => currentLocation.startsWith(item.route));
     if (selectedIndex == -1) selectedIndex = 0;
 
-    final isDesktop = MediaQuery.of(context).size.width > 900;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth > 900;
+    final needsScroll = !isDesktop && (screenWidth < (items.length * 80));
 
-    return Center(
-      child: Container(
-        height: 75,
-        width: isDesktop ? 600 : double.infinity,
-        margin: EdgeInsets.fromLTRB(20, 0, 20, isDesktop ? 25 : 15),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
+    return StreamBuilder<List<NotificationModel>>(
+      stream: user != null
+          ? Provider.of<DatabaseService>(context, listen: false)
+              .getNotifications(user.uid)
+          : const Stream.empty(),
+      builder: (context, snapshot) {
+        final unreadCount = (snapshot.data ?? []).where((n) => n.isRead == false).length;
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          FlutterAppBadger.isAppBadgeSupported().then((supported) {
+            if (supported) {
+              if (unreadCount > 0) {
+                FlutterAppBadger.updateBadgeCount(unreadCount);
+              } else {
+                FlutterAppBadger.removeBadge();
+              }
+            }
+          }).catchError((_) {});
+        });
+
+        Widget buildNavIcon(int idx, _NavItem item, bool isSelected, {bool compact = false}) {
+          final isAlerts = item.route == '/notifications';
+          final iconWidget = Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(
+                item.icon,
+                color: isSelected ? ThemeProvider.accentTeal : Colors.white70,
+                size: 22,
+              ),
+              if (isAlerts && unreadCount > 0)
+                Positioned(
+                  top: -5,
+                  right: -6,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text(
+                      unreadCount > 99 ? '99+' : '$unreadCount',
+                      style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          );
+
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => context.go(item.route),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: compact ? 80 : null,
+              padding: compact
+                  ? const EdgeInsets.symmetric(vertical: 8)
+                  : const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: ThemeProvider.primaryNavy.withOpacity(0.95),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
+                color: isSelected ? ThemeProvider.accentTeal.withOpacity(0.15) : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  iconWidget,
+                  const SizedBox(height: 2),
+                  Text(
+                    item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(
+                      color: isSelected ? ThemeProvider.accentTeal : Colors.white70,
+                      fontSize: 10,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: items.asMap().entries.map((entry) {
-                  final idx = entry.key;
-                  final item = entry.value;
-                  final isSelected = idx == selectedIndex;
+            ),
+          );
+        }
 
-                  return GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => context.go(item.route),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isSelected ? ThemeProvider.accentTeal.withOpacity(0.15) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            item.icon,
-                            color: isSelected ? ThemeProvider.accentTeal : Colors.white70,
-                            size: 22,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            item.label,
-                            style: GoogleFonts.outfit(
-                              color: isSelected ? ThemeProvider.accentTeal : Colors.white70,
-                              fontSize: 10,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+        Widget navContent;
+        if (needsScroll) {
+          navContent = SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: items.asMap().entries.map((entry) {
+                  return buildNavIcon(entry.key, entry.value, entry.key == selectedIndex, compact: true);
                 }).toList(),
               ),
             ),
+          );
+        } else {
+          navContent = Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: items.asMap().entries.map((entry) {
+              return buildNavIcon(entry.key, entry.value, entry.key == selectedIndex);
+            }).toList(),
+          );
+        }
+
+        return Center(
+          child: Container(
+            height: 75,
+            width: isDesktop ? 600 : double.infinity,
+            margin: EdgeInsets.fromLTRB(20, 0, 20, isDesktop ? 25 : 15),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: ThemeProvider.primaryNavy.withOpacity(0.95),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: navContent,
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
+
 
   List<_NavItem> _getNavItems(AppMode mode) {
     if (mode == AppMode.standalone) {
       return [
-        _NavItem(Icons.dashboard_rounded, 'Home', '/dashboard'),
-        _NavItem(Icons.apartment_rounded, 'Properties', '/properties'),
-        _NavItem(Icons.people_alt_rounded, 'Tenants', '/tenants'),
-        _NavItem(Icons.account_balance_wallet_rounded, 'Finance', '/transactions'),
-        _NavItem(Icons.more_horiz_rounded, 'Settings', '/more'),
+        _NavItem(Icons.dashboard_rounded, AppLocalizations.of(context)?.home ?? 'Home', '/dashboard'),
+        _NavItem(Icons.apartment_rounded, AppLocalizations.of(context)?.properties ?? 'Properties', '/properties'),
+        _NavItem(Icons.people_alt_rounded, AppLocalizations.of(context)?.tenants ?? 'Tenants', '/tenants'),
+        _NavItem(Icons.account_balance_wallet_rounded, AppLocalizations.of(context)?.finance ?? 'Finance', '/transactions'),
+        _NavItem(Icons.notifications_rounded, AppLocalizations.of(context)?.alerts ?? 'Alerts', '/notifications'),
+        _NavItem(Icons.more_horiz_rounded, AppLocalizations.of(context)?.settings ?? 'Settings', '/more'),
       ];
     } else {
       return [
@@ -347,6 +444,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         _NavItem(Icons.groups_rounded, 'Community', '/community'),
         _NavItem(Icons.shield_rounded, 'Gate', '/gate'),
         _NavItem(Icons.campaign_rounded, 'Notices', '/notices'),
+        _NavItem(Icons.notifications_rounded, 'Alerts', '/notifications'),
         _NavItem(Icons.more_horiz_rounded, 'Settings', '/more'),
       ];
     }

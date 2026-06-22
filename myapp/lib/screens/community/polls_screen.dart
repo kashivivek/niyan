@@ -21,7 +21,7 @@ class PollsScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Community Polls', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
       ),
@@ -76,7 +76,7 @@ class _PollCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade100),
         boxShadow: [
@@ -96,14 +96,14 @@ class _PollCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   poll.question,
-                  style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy),
+                  style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
                 ),
               ),
               if (isClosed)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: Theme.of(context).dividerColor,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text('CLOSED', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
@@ -177,7 +177,7 @@ class _PollCard extends StatelessWidget {
         ),
         child: Text(
           opt.text,
-          style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: ThemeProvider.primaryNavy),
+          style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: Theme.of(context).colorScheme.primary),
         ),
       ),
     );

@@ -14,6 +14,8 @@ import 'package:myapp/screens/dashboard_screen.dart';
 import 'package:myapp/screens/property_list_screen.dart';
 import 'package:myapp/screens/tenant_list_screen.dart';
 import 'package:myapp/screens/settings_screen.dart';
+import 'package:myapp/screens/notification_settings_screen.dart';
+import 'package:myapp/screens/preferences_screen.dart';
 import 'package:myapp/screens/add_property_screen.dart';
 import 'package:myapp/screens/add_tenant_screen.dart';
 import 'package:myapp/screens/add_transaction_screen.dart';
@@ -23,6 +25,7 @@ import 'package:myapp/screens/edit_tenant_screen.dart';
 import 'package:myapp/screens/add_unit_screen.dart';
 import 'package:myapp/screens/society/society_selector_screen.dart';
 import 'package:myapp/screens/invoice_list_screen.dart';
+import 'package:myapp/screens/notifications_screen.dart';
 import 'package:myapp/screens/invoice_detail_screen.dart';
 import 'package:myapp/screens/vendor_directory_screen.dart';
 import 'package:myapp/screens/add_vendor_screen.dart';
@@ -52,6 +55,8 @@ import 'package:myapp/screens/landing_page.dart';
 import 'package:myapp/screens/society/community_screen.dart';
 import 'package:myapp/screens/society/community_post_detail_screen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:provider/provider.dart';
+import 'package:myapp/providers/theme_provider.dart';
 
 class AppRouter {
   final AuthService authService;
@@ -87,7 +92,18 @@ class AppRouter {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => const LandingPage(),
+        builder: (context, state) {
+          final auth = context.read<AuthService>();
+          if (!auth.initialized) {
+            return Scaffold(
+              backgroundColor: ThemeProvider.primaryNavy,
+              body: const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              ),
+            );
+          }
+          return const LandingPage();
+        },
       ),
       GoRoute(
         path: '/login',
@@ -132,6 +148,10 @@ class AppRouter {
             builder: (context, state) => const SettingsScreen(),
           ),
           GoRoute(
+            path: '/notifications',
+            builder: (context, state) => const NotificationsScreen(),
+          ),
+          GoRoute(
             path: '/settings',
             builder: (context, state) => const SettingsScreen(),
           ),
@@ -148,7 +168,11 @@ class AppRouter {
           ),
           GoRoute(
             path: '/tenants/add',
-            builder: (context, state) => const AddTenantScreen(),
+            builder: (context, state) {
+              final pid = state.uri.queryParameters['propertyId'];
+              final uid = state.uri.queryParameters['unitId'];
+              return AddTenantScreen(propertyId: pid, unitId: uid);
+            },
           ),
           GoRoute(
             path: '/tenants/edit',
@@ -341,7 +365,23 @@ class AppRouter {
           // Notification settings standalone screen
           GoRoute(
             path: '/settings/notifications',
-            builder: (context, state) => const SettingsScreen(),
+            builder: (context, state) => const NotificationSettingsScreen(),
+          ),
+          GoRoute(
+            path: '/settings/preferences',
+            builder: (context, state) => const PreferencesScreen(),
+          ),
+          GoRoute(
+            path: '/settings/account_security',
+            builder: (context, state) => const _PlaceholderScreen(title: 'Account Security'),
+          ),
+          GoRoute(
+            path: '/help_center',
+            builder: (context, state) => const _PlaceholderScreen(title: 'Help Center'),
+          ),
+          GoRoute(
+            path: '/report_issue',
+            builder: (context, state) => const _PlaceholderScreen(title: 'Report an Issue'),
           ),
         ],
       ),

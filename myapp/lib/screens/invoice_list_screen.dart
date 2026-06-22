@@ -49,7 +49,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen>
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Invoices',
             style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 20)),
@@ -100,10 +100,10 @@ class _InvoiceListScreenState extends State<InvoiceListScreen>
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/invoices/create'),
-        backgroundColor: ThemeProvider.accentBlue,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark ? ThemeProvider.accentTeal : ThemeProvider.accentBlue,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
         label: Text('New Invoice',
-            style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600)),
+            style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontWeight: FontWeight.w600)),
       ),
       body: StreamBuilder<List<InvoiceModel>>(
         stream: stream,
@@ -172,7 +172,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen>
                     style: GoogleFonts.outfit(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
-                        color: ThemeProvider.primaryNavy),
+                        color: Theme.of(context).colorScheme.primary),
                   ),
                   const Spacer(),
                   if (totalDue > 0)
@@ -220,7 +220,7 @@ class _InvoiceCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: Colors.grey.shade100),
           boxShadow: [
@@ -245,7 +245,7 @@ class _InvoiceCard extends StatelessWidget {
                         style: GoogleFonts.outfit(
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
-                            color: ThemeProvider.primaryNavy),
+                            color: Theme.of(context).colorScheme.primary),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -289,7 +289,7 @@ class _InvoiceCard extends StatelessWidget {
                   style: GoogleFonts.outfit(
                       fontWeight: FontWeight.bold,
                       fontSize: 17,
-                      color: ThemeProvider.primaryNavy),
+                      color: Theme.of(context).colorScheme.primary),
                 ),
               ],
             ),

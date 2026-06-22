@@ -23,6 +23,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:developer' as developer;
 import 'dart:async';
 import 'package:home_widget/home_widget.dart';
+import 'package:myapp/models/notification_model.dart';
+import 'package:myapp/l10n/generated/app_localizations.dart';
 
 Map<String, dynamic> _calculateSummary(Map<String, dynamic> data) {
   final properties = data['properties'] as List<PropertyModel>;
@@ -67,20 +69,55 @@ class _StandaloneDashboardScreenState extends State<StandaloneDashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       NotificationService().requestPermissions();
       _setupNotificationListener();
+      _triggerRentIncreaseCheck();
     });
   }
 
-  Future<void> _updateHomeWidget(List<ActionItem> items) async {
-    final overdue = items.where((i) => i.isOverdue).length;
-    final upcoming = items.where((i) => !i.isOverdue).length;
+  Future<void> _triggerRentIncreaseCheck() async {
+    try {
+      final user = Provider.of<UserModel?>(context, listen: false);
+      if (user != null) {
+        final db = Provider.of<DatabaseService>(context, listen: false);
+        await db.ensureRentRecordsExist(user.uid);
+      }
+    } catch (e) {
+      // Silently fail — not critical path
+    }
+  }
 
-    await HomeWidget.saveWidgetData<String>('overdue_count', overdue.toString());
-    await HomeWidget.saveWidgetData<String>('upcoming_count', upcoming.toString());
+  Future<void> _updateHomeWidget(List<ActionItem> items) async {
+    final user = Provider.of<UserModel?>(context, listen: false);
+    final currency = user?.currency ?? 'USD';
+
+    final overdueItems = items.where((i) => i.isOverdue).toList();
+    final upcomingItems = items.where((i) => !i.isOverdue).toList();
+
+    final overdueCount = overdueItems.length;
+    final upcomingCount = upcomingItems.length;
+
+    // Build details lines: "Property · Unit  Tenant – Amount"
+    String buildDetails(List<ActionItem> list) {
+      if (list.isEmpty) return '';
+      return list.take(3).map((i) {
+        final prop = i.propertyName.isNotEmpty ? i.propertyName : '—';
+        final unit = i.unitNumber.isNotEmpty ? i.unitNumber : '—';
+        final tenant = i.tenant.name.isNotEmpty ? i.tenant.name : '—';
+        final amount = CurrencyHelper.formatNoDecimal(i.amount, currency);
+        return '$prop · $unit  $tenant – $amount';
+      }).join('\n');
+    }
+
+    final overdueDetails = overdueCount > 0 ? buildDetails(overdueItems) : 'No overdue rents';
+    final upcomingDetails = upcomingCount > 0 ? buildDetails(upcomingItems) : 'No upcoming rents';
+
+    await HomeWidget.saveWidgetData<String>('overdue_count', overdueCount.toString());
+    await HomeWidget.saveWidgetData<String>('upcoming_count', upcomingCount.toString());
+    await HomeWidget.saveWidgetData<String>('overdue_details', overdueDetails);
+    await HomeWidget.saveWidgetData<String>('upcoming_details', upcomingDetails);
     await HomeWidget.saveWidgetData<String>('last_updated', 'Updated ${DateFormat('HH:mm').format(DateTime.now())}');
     
     await HomeWidget.updateWidget(
-      name: 'NiyanWidgetProvider',
-      androidName: 'NiyanWidgetProvider',
+      qualifiedAndroidName: 'com.kashivivek.niyan.NiyanWidgetProvider',
       iOSName: 'NiyanWidget',
     );
   }
@@ -104,7 +141,7 @@ class _StandaloneDashboardScreenState extends State<StandaloneDashboardScreen> {
       if (user != null && user.notificationsEnabled && !kIsWeb) {
         if (_lastActionItems == null || _lastActionItems!.length != items.length) {
           developer.log('Rescheduling notifications for ${items.length} items');
-          NotificationService().scheduleRentReminders(items, user.notificationTime, user.notificationTimezone, user.notificationFrequency);
+          NotificationService().scheduleRentReminders(items, user.notificationTime, user.notificationTimezone, user.notificationFrequency, ownerId: user.uid);
           _lastActionItems = items;
         }
       }
@@ -135,7 +172,7 @@ class _StandaloneDashboardScreenState extends State<StandaloneDashboardScreen> {
     final userStream = authService.user;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: StreamBuilder<UserModel?>(
         stream: userStream,
         builder: (context, snapshot) {
@@ -161,32 +198,38 @@ class _StandaloneDashboardScreenState extends State<StandaloneDashboardScreen> {
                         if (user.societyIds.isNotEmpty)
                           _buildContextSwitcherBanner(context),
                         const SizedBox(height: 12),
-                        Text(
-                          'Welcome, ${(user.name?.split(' ') ?? ['Vivek']).first}!',
-                          style: GoogleFonts.outfit(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: ThemeProvider.primaryNavy,
-                            letterSpacing: -0.5,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              AppLocalizations.of(context)?.welcomeUser((user.name?.split(' ') ?? ['Vivek']).first) ?? 'Welcome, ${(user.name?.split(' ') ?? ['Vivek']).first}!',
+                              style: GoogleFonts.outfit(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            _buildNotificationBell(context, databaseService, user.uid),
+                          ],
                         ),
                         Text(
-                          'Here is what is happening with your portfolio today.',
+                          AppLocalizations.of(context)?.portfolioSubtitle ?? 'Here is what is happening with your portfolio today.',
                           style: GoogleFonts.inter(
                             fontSize: 14,
-                            color: Colors.grey.shade500,
+                            color: Theme.of(context).textTheme.bodyMedium?.color,
                           ),
                         ),
                         const SizedBox(height: 16),
                         _buildSummaryCards(databaseService, user),
                         const SizedBox(height: 32),
                         Text(
-                          'Upcoming Rents (7 days)',
+                          AppLocalizations.of(context)?.upcomingRents7Days ?? 'Upcoming Rents (7 days)',
                           key: _upcomingRentsKey,
                           style: GoogleFonts.inter(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: ThemeProvider.primaryNavy,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -205,6 +248,48 @@ class _StandaloneDashboardScreenState extends State<StandaloneDashboardScreen> {
   }
 
 
+
+  Widget _buildNotificationBell(BuildContext context, DatabaseService databaseService, String userId) {
+    return StreamBuilder<List<NotificationModel>>(
+      stream: databaseService.getNotifications(userId),
+      builder: (context, snapshot) {
+        int unreadCount = 0;
+        if (snapshot.hasData) {
+          unreadCount = snapshot.data!.where((n) => !n.isRead).length;
+        }
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              icon: Icon(Icons.notifications_outlined, color: Theme.of(context).colorScheme.primary, size: 28),
+              onPressed: () => context.push('/notifications'),
+            ),
+            if (unreadCount > 0)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    unreadCount > 9 ? '9+' : unreadCount.toString(),
+                    style: GoogleFonts.inter(
+                      color: Theme.of(context).cardColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
 
   Widget _buildContextSwitcherBanner(BuildContext context) {
     return Container(
@@ -248,10 +333,11 @@ class _StandaloneDashboardScreenState extends State<StandaloneDashboardScreen> {
   }
 
   Widget _buildSummaryCards(DatabaseService databaseService, UserModel user) {
+    final firestore = Provider.of<FirebaseFirestore>(context, listen: false);
     final summaryStream = CombineLatestStream.combine3(
       databaseService.getProperties(user.uid).onErrorReturn(<PropertyModel>[]),
       databaseService.allUnits(user.uid).onErrorReturn(<UnitModel>[]),
-      FirebaseFirestore.instance.collection('rentRecords').where('ownerId', isEqualTo: user.uid).snapshots().map((s) => s.docs.map((d) => RentRecordModel.fromFirestore(d)).toList()),
+      firestore.collection('rentRecords').where('ownerId', isEqualTo: user.uid).snapshots().map((s) => s.docs.map((d) => RentRecordModel.fromFirestore(d)).toList()),
       (List<PropertyModel> p, List<UnitModel> u, List<RentRecordModel> r) => {'properties': p, 'units': u, 'records': r},
     ).debounceTime(const Duration(milliseconds: 300));
 
@@ -262,48 +348,42 @@ class _StandaloneDashboardScreenState extends State<StandaloneDashboardScreen> {
           return const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()));
         }
 
-        return FutureBuilder<Map<String, dynamic>>(
-          future: Future.value(_calculateSummary(snapshot.data!)),
-          builder: (context, futureSnapshot) {
-            if (!futureSnapshot.hasData) return const SizedBox.shrink();
-            final data = futureSnapshot.data!;
+        final data = _calculateSummary(snapshot.data!);
 
-            return GridView.count(
-              crossAxisCount: MediaQuery.of(context).size.width > 800 ? 4 : 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: MediaQuery.of(context).size.width > 800 ? 1.4 : 1.2,
-              children: [
-                _buildKpiCard(
-                  context, 
-                  'Properties', 
-                  '${data['propertiesCount']}', 
-                  Icons.apartment_rounded, 
-                  ThemeProvider.accentBlue,
-                  onTap: () => context.push('/properties'),
-                ),
-                _buildKpiCard(context, 'Occupancy', '${data['occupiedUnits']}/${data['unitsCount']}', Icons.door_front_door_rounded, Colors.teal),
-                _buildKpiCard(
-                  context, 
-                  'Pending Rents', 
-                  CurrencyHelper.formatNoDecimal(data['pendingTotal'] as double, user.currency), 
-                  Icons.pending_actions_rounded, 
-                  Colors.red.shade600,
-                  onTap: _scrollToUpcomingRents,
-                ),
-                _buildKpiCard(
-                  context, 
-                  'Collected', 
-                  CurrencyHelper.formatNoDecimal(data['collectedTotal'] as double, user.currency), 
-                  Icons.account_balance_wallet_rounded, 
-                  Colors.purple,
-                  onTap: () => context.push('/transactions'),
-                ),
-              ],
-            );
-          },
+        return GridView.count(
+          crossAxisCount: MediaQuery.of(context).size.width > 800 ? 4 : 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: MediaQuery.of(context).size.width > 800 ? 1.4 : 1.2,
+          children: [
+            _buildKpiCard(
+              context, 
+              AppLocalizations.of(context)?.properties ?? 'Properties', 
+              '${data['propertiesCount']}', 
+              Icons.apartment_rounded, 
+              ThemeProvider.accentBlue,
+              onTap: () => context.push('/properties'),
+            ),
+            _buildKpiCard(context, AppLocalizations.of(context)?.occupancy ?? 'Occupancy', '${data['occupiedUnits']}/${data['unitsCount']}', Icons.door_front_door_rounded, Colors.teal),
+            _buildKpiCard(
+              context, 
+              AppLocalizations.of(context)?.pendingRents ?? 'Pending Rents', 
+              CurrencyHelper.formatNoDecimal(data['pendingTotal'] as double, user.currency), 
+              Icons.pending_actions_rounded, 
+              Colors.red.shade600,
+              onTap: _scrollToUpcomingRents,
+            ),
+            _buildKpiCard(
+              context, 
+              AppLocalizations.of(context)?.collected ?? 'Collected', 
+              CurrencyHelper.formatNoDecimal(data['collectedTotal'] as double, user.currency), 
+              Icons.account_balance_wallet_rounded, 
+              Colors.purple,
+              onTap: () => context.push('/transactions'),
+            ),
+          ],
         );
       },
     );
@@ -314,9 +394,9 @@ class _StandaloneDashboardScreenState extends State<StandaloneDashboardScreen> {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardTheme.color ?? Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
           boxShadow: [
             if (onTap != null) BoxShadow(color: accent.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 4)),
           ],
@@ -340,8 +420,8 @@ class _StandaloneDashboardScreenState extends State<StandaloneDashboardScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(value, style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: ThemeProvider.primaryNavy)),
-                Text(title, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                Text(value, style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.primary)),
+                Text(title, style: GoogleFonts.inter(fontSize: 12, color: Theme.of(context).textTheme.bodyMedium?.color, fontWeight: FontWeight.w500)),
               ],
             ),
           ],
@@ -367,32 +447,135 @@ class _ActionCenterListState extends State<_ActionCenterList> {
 
   String _itemKey(ActionItem item) => item.rentRecordId ?? '${item.tenant.id}_${item.month}';
 
-  Future<void> _recordPayment(ActionItem item) async {
-    if (item.rentRecordId != null) {
-      await widget.databaseService.recordRentPayment(item: item, ownerId: widget.user.uid);
-    } else {
-      await widget.databaseService.recordTransaction(
-        propertyId: item.propertyId,
-        unitId: item.unitId,
-        tenantId: item.tenant.id,
-        amount: item.amount,
-        description: 'Rent for ${item.month}',
-        type: 'income',
-        month: item.month,
-      );
-    }
-  }
-
   Future<void> _recordSelectedPayments(List<ActionItem> allItems) async {
     if (_selectedKeys.isEmpty) return;
-    setState(() => _isProcessing = true);
+    
     final selected = allItems.where((item) => _selectedKeys.contains(_itemKey(item))).toList();
+    final Map<String, DateTime> selectedDates = {
+      for (var item in selected) _itemKey(item): DateTime.now()
+    };
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Theme.of(context).cardColor,
+              title: Text('Mark as Received', style: GoogleFonts.outfit(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Select date received for each payment:', style: GoogleFonts.inter(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: selected.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final item = selected[index];
+                          final key = _itemKey(item);
+                          final propUnit = item.propertyName.isNotEmpty && item.unitNumber.isNotEmpty ? '${item.propertyName} - ${item.unitNumber}' : '—';
+                          
+                          return Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(item.tenant.name, style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+                                      Text(propUnit, style: GoogleFonts.inter(fontSize: 12, color: Theme.of(context).textTheme.bodyMedium?.color)),
+                                    ],
+                                  ),
+                                ),
+                                InkWell(
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: selectedDates[key]!,
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime.now(),
+                                    );
+                                    if (picked != null) {
+                                      setDialogState(() => selectedDates[key] = picked);
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Text(DateFormat('MMM d').format(selectedDates[key]!), style: GoogleFonts.inter(fontSize: 12, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600)),
+                                        const SizedBox(width: 4),
+                                        Icon(Icons.calendar_today_rounded, size: 14, color: Theme.of(context).colorScheme.primary),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Confirm'),
+                ),
+              ],
+            );
+          }
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isProcessing = true);
     int success = 0;
     for (final item in selected) {
       try {
-        await _recordPayment(item);
+        final paymentDate = selectedDates[_itemKey(item)] ?? DateTime.now();
+        if (item.rentRecordId != null) {
+          await widget.databaseService.recordRentPayment(item: item, ownerId: widget.user.uid, paymentDate: paymentDate);
+        } else {
+          await widget.databaseService.recordTransaction(
+            propertyId: item.propertyId,
+            unitId: item.unitId,
+            tenantId: item.tenant.id,
+            amount: item.amount,
+            description: 'Rent for ${item.month}',
+            type: 'income',
+            month: item.month,
+            date: paymentDate,
+          );
+        }
         success++;
-      } catch (_) {}
+      } catch (e) {
+        developer.log('Error recording payment', error: e);
+      }
     }
     if (mounted) {
       setState(() {
@@ -418,7 +601,7 @@ class _ActionCenterListState extends State<_ActionCenterList> {
             width: double.infinity,
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.grey.shade200),
             ),
@@ -426,7 +609,7 @@ class _ActionCenterListState extends State<_ActionCenterList> {
               children: [
                 Icon(Icons.check_circle_outline_rounded, color: Colors.green.shade400, size: 64),
                 const SizedBox(height: 16),
-                Text('All caught up!', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                Text('All caught up!', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                 Text('No upcoming rent payments.', style: GoogleFonts.inter(color: Colors.grey.shade600)),
               ],
             ),
@@ -466,9 +649,15 @@ class _ActionCenterListState extends State<_ActionCenterList> {
 
                 return Container(
                   decoration: BoxDecoration(
-                    color: isSelected ? Colors.blue.shade50 : Colors.white,
+                    color: isSelected 
+                        ? Theme.of(context).colorScheme.primary.withOpacity(0.05) 
+                        : Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: isSelected ? ThemeProvider.accentBlue : Colors.grey.shade200),
+                    border: Border.all(
+                      color: isSelected 
+                          ? ThemeProvider.accentBlue 
+                          : (Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200)
+                    ),
                     boxShadow: [
                       BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
                     ],
@@ -497,7 +686,7 @@ class _ActionCenterListState extends State<_ActionCenterList> {
                       },
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                     ),
-                    title: Text(item.title, style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                    title: Text(item.tenant.name, style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -522,7 +711,7 @@ class _ActionCenterListState extends State<_ActionCenterList> {
                       children: [
                         Text(
                           CurrencyHelper.formatNoDecimal(item.amount, widget.user.currency),
-                          style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: ThemeProvider.primaryNavy),
+                          style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.primary),
                         ),
                         Text('Rent', style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
                       ],

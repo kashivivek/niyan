@@ -111,7 +111,7 @@ class _VisitorPreApproveScreenState extends State<VisitorPreApproveScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Invite Visitor',
             style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
@@ -285,7 +285,7 @@ class _VisitorPreApproveScreenState extends State<VisitorPreApproveScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
       ),
@@ -301,7 +301,7 @@ class _VisitorPreApproveScreenState extends State<VisitorPreApproveScreen> {
                     style: GoogleFonts.outfit(
                         fontWeight: FontWeight.w500,
                         fontSize: 14,
-                        color: ThemeProvider.primaryNavy)),
+                        color: Theme.of(context).colorScheme.primary)),
                 Text(subtitle,
                     style: GoogleFonts.inter(
                         fontSize: 12, color: Colors.grey.shade500)),
@@ -333,7 +333,7 @@ class _VisitorPreApproveScreenState extends State<VisitorPreApproveScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey.shade200),
         ),
@@ -464,7 +464,7 @@ class _QrPassScreen extends StatelessWidget {
                       'Visitor Pass',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.outfit(
-                          color: Colors.white,
+                          color: Theme.of(context).cardColor,
                           fontWeight: FontWeight.bold,
                           fontSize: 20),
                     ),
@@ -483,7 +483,7 @@ class _QrPassScreen extends StatelessWidget {
                       margin: const EdgeInsets.symmetric(horizontal: 32),
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
@@ -520,7 +520,7 @@ class _QrPassScreen extends StatelessWidget {
                                         style: GoogleFonts.outfit(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 18,
-                                            color: ThemeProvider.primaryNavy)),
+                                            color: Theme.of(context).colorScheme.primary)),
                                     Text(visitorPhone,
                                         style: GoogleFonts.inter(
                                             fontSize: 13,
@@ -544,13 +544,13 @@ class _QrPassScreen extends StatelessWidget {
                             version: QrVersions.auto,
                             size: 200.0,
                             backgroundColor: Colors.white,
-                            eyeStyle: const QrEyeStyle(
+                            eyeStyle: QrEyeStyle(
                               eyeShape: QrEyeShape.square,
-                              color: ThemeProvider.primaryNavy,
+                              color: Theme.of(context).colorScheme.primary,
                             ),
-                            dataModuleStyle: const QrDataModuleStyle(
+                            dataModuleStyle: QrDataModuleStyle(
                               dataModuleShape: QrDataModuleShape.square,
-                              color: ThemeProvider.primaryNavy,
+                              color: Theme.of(context).colorScheme.primary,
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -558,7 +558,7 @@ class _QrPassScreen extends StatelessWidget {
                             qrCode,
                             style: GoogleFonts.robotoMono(
                                 fontSize: 13,
-                                color: Colors.grey.shade500,
+                                color: Theme.of(context).textTheme.bodyMedium?.color,
                                 letterSpacing: 1),
                           ),
                           if (expectedAt != null) ...[

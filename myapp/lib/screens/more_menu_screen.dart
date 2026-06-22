@@ -7,6 +7,7 @@ import 'package:myapp/models/member_model.dart';
 import 'package:myapp/services/auth_service.dart';
 import 'package:myapp/providers/theme_provider.dart';
 import 'package:myapp/providers/app_mode_provider.dart';
+import 'package:myapp/l10n/generated/app_localizations.dart';
 
 class MoreMenuScreen extends StatelessWidget {
   const MoreMenuScreen({super.key});
@@ -19,7 +20,7 @@ class MoreMenuScreen extends StatelessWidget {
         user?.currentRole == AppRole.superAdmin;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700),
@@ -29,44 +30,47 @@ class MoreMenuScreen extends StatelessWidget {
               if (user != null) _buildProfileHeader(context, user),
               const SizedBox(height: 28),
 
-              _buildSectionHeader('Account'),
+              _buildSectionHeader(AppLocalizations.of(context)?.appSettings ?? 'App Settings'),
               _buildMenuTile(
                 context,
-                'Edit Profile',
-                Icons.person_outline_rounded,
-                () => context.push('/profile/edit'),
+                AppLocalizations.of(context)?.preferences ?? 'Preferences',
+                Icons.tune_rounded,
+                () => context.push('/settings/preferences'),
               ),
               _buildMenuTile(
                 context,
-                'Notification Settings',
+                AppLocalizations.of(context)?.notificationSettings ?? 'Notification Settings',
                 Icons.notifications_rounded,
                 () => context.push('/settings/notifications'),
               ),
+
+              const SizedBox(height: 24),
+              _buildSectionHeader(AppLocalizations.of(context)?.accountAndSecurity ?? 'Account & Security'),
               _buildMenuTile(
                 context,
-                'Account Security',
+                AppLocalizations.of(context)?.accountSecurity ?? 'Account Security',
                 Icons.security_rounded,
-                () {},
+                () => context.push('/settings/account_security'),
               ),
 
               const SizedBox(height: 24),
-              _buildSectionHeader('Community & Society'),
+              _buildSectionHeader(AppLocalizations.of(context)?.communityAndSociety ?? 'Community & Society'),
               _buildMenuTile(
                 context,
-                'Switch Property Mode',
+                AppLocalizations.of(context)?.switchPropertyMode ?? 'Switch Property Mode',
                 Icons.swap_horiz_rounded,
                 () => context.push('/select-society'),
               ),
               _buildMenuTile(
                 context,
-                'Document Library',
+                AppLocalizations.of(context)?.documentLibrary ?? 'Document Library',
                 Icons.folder_rounded,
                 () => context.push('/documents'),
               ),
               if (isAdmin)
                 _buildMenuTile(
                   context,
-                  'Invite New Member',
+                  AppLocalizations.of(context)?.inviteNewMember ?? 'Invite New Member',
                   Icons.person_add_rounded,
                   () => context.push('/society/invite'),
                   color: ThemeProvider.accentTeal,
@@ -74,16 +78,16 @@ class MoreMenuScreen extends StatelessWidget {
               if (isAdmin)
                 _buildMenuTile(
                   context,
-                  'Society Settings',
+                  AppLocalizations.of(context)?.societySettings ?? 'Society Settings',
                   Icons.settings_rounded,
                   () => context.push('/society/settings'),
-                  color: ThemeProvider.primaryNavy,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
 
               const SizedBox(height: 24),
-              _buildSectionHeader('Support'),
-              _buildMenuTile(context, 'Help Center', Icons.help_outline_rounded, () {}),
-              _buildMenuTile(context, 'Report an Issue', Icons.bug_report_outlined, () {}),
+              _buildSectionHeader(AppLocalizations.of(context)?.support ?? 'Support'),
+              _buildMenuTile(context, AppLocalizations.of(context)?.helpCenter ?? 'Help Center', Icons.help_outline_rounded, () => context.push('/help_center')),
+              _buildMenuTile(context, AppLocalizations.of(context)?.reportAnIssue ?? 'Report an Issue', Icons.bug_report_outlined, () => context.push('/report_issue')),
 
               const SizedBox(height: 40),
               _buildLogoutButton(context),
@@ -95,12 +99,13 @@ class MoreMenuScreen extends StatelessWidget {
   }
 
   Widget _buildProfileHeader(BuildContext context, UserModel user) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey.shade100),
+        border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade100),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
         ],
@@ -116,7 +121,7 @@ class MoreMenuScreen extends StatelessWidget {
             child: (user.photoUrl == null || user.photoUrl!.isEmpty)
                 ? Text(
                     user.name?.substring(0, 1).toUpperCase() ?? 'U',
-                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                    style: TextStyle(color: Theme.of(context).cardColor, fontSize: 22, fontWeight: FontWeight.bold),
                   )
                 : null,
           ),
@@ -130,7 +135,7 @@ class MoreMenuScreen extends StatelessWidget {
                   style: GoogleFonts.outfit(
                     fontWeight: FontWeight.bold,
                     fontSize: 17,
-                    color: ThemeProvider.primaryNavy,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
                 Text(
@@ -192,7 +197,7 @@ class MoreMenuScreen extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
@@ -210,7 +215,7 @@ class MoreMenuScreen extends StatelessWidget {
         ),
         title: Text(
           title,
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: ThemeProvider.primaryNavy),
+          style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: Theme.of(context).colorScheme.primary),
         ),
         trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

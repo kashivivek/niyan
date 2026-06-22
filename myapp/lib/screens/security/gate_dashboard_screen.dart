@@ -108,7 +108,7 @@ class _GateDashboardScreenState extends State<GateDashboardScreen>
           if (_isScanning)
             Positioned.fill(
               child: Container(
-                color: Colors.black,
+                color: Theme.of(context).colorScheme.primary,
                 child: Stack(
                   children: [
                     MobileScanner(
@@ -138,18 +138,18 @@ class _GateDashboardScreenState extends State<GateDashboardScreen>
                       top: 40,
                       right: 20,
                       child: IconButton(
-                        icon: const Icon(Icons.close_rounded, color: Colors.white, size: 32),
+                        icon: Icon(Icons.close_rounded, color: Theme.of(context).cardColor, size: 32),
                         onPressed: () => setState(() => _isScanning = false),
                       ),
                     ),
-                    const Positioned(
+                    Positioned(
                       bottom: 80,
                       left: 0,
                       right: 0,
                       child: Center(
                         child: Text(
                           'Scan Resident or Visitor QR',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -169,7 +169,7 @@ class _GateDashboardScreenState extends State<GateDashboardScreen>
               heroTag: 'walkin',
               onPressed: () => _showWalkInSheet(context, society.id),
               backgroundColor: Colors.white,
-              child: const Icon(Icons.person_add_alt_1_rounded, color: ThemeProvider.primaryNavy),
+              child: Icon(Icons.person_add_alt_1_rounded, color: Theme.of(context).colorScheme.primary),
             ),
             const SizedBox(height: 12),
             FloatingActionButton.extended(
@@ -177,7 +177,7 @@ class _GateDashboardScreenState extends State<GateDashboardScreen>
               onPressed: () => setState(() => _isScanning = true),
               backgroundColor: ThemeProvider.accentTeal,
               icon: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white),
-              label: Text('SCAN QR', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+              label: Text('SCAN QR', style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -203,7 +203,7 @@ class _GateDashboardScreenState extends State<GateDashboardScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Gate Operations', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
+                Text('Gate Operations', style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold, fontSize: 22)),
               ],
             ),
           ),
@@ -211,7 +211,7 @@ class _GateDashboardScreenState extends State<GateDashboardScreen>
             stream: Stream.periodic(const Duration(seconds: 1)),
             builder: (context, _) => Text(
               DateFormat('HH:mm').format(DateTime.now()),
-              style: GoogleFonts.outfit(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+              style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontSize: 24, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -231,7 +231,7 @@ class _GateDashboardScreenState extends State<GateDashboardScreen>
             children: [
               _StatTile(label: 'INSIDE', value: '$inside', icon: Icons.group_rounded, color: ThemeProvider.accentTeal),
               const SizedBox(width: 16),
-              _StatTile(label: 'TODAY', value: DateFormat('MMM d').format(DateTime.now()), icon: Icons.calendar_today_rounded, color: ThemeProvider.primaryNavy),
+              _StatTile(label: 'TODAY', value: DateFormat('MMM d').format(DateTime.now()), icon: Icons.calendar_today_rounded, color: Theme.of(context).colorScheme.primary),
             ],
           ),
         );
@@ -295,8 +295,8 @@ class _GateDashboardScreenState extends State<GateDashboardScreen>
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
         ),
         child: Column(
@@ -309,7 +309,7 @@ class _GateDashboardScreenState extends State<GateDashboardScreen>
               child: const Icon(Icons.person_rounded, size: 40, color: ThemeProvider.accentTeal),
             ),
             const SizedBox(height: 16),
-            Text(resident.name ?? 'Resident', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+            Text(resident.name ?? 'Resident', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
             Text('Resident verified', style: GoogleFonts.inter(color: Colors.green, fontWeight: FontWeight.bold)),
             const SizedBox(height: 32),
             SizedBox(
@@ -354,7 +354,7 @@ class _StatTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.grey.shade100),
         ),
@@ -369,8 +369,8 @@ class _StatTile extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: GoogleFonts.inter(fontSize: 10, color: Colors.grey.shade500, fontWeight: FontWeight.bold)),
-                Text(value, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                Text(label, style: GoogleFonts.inter(fontSize: 10, color: Theme.of(context).textTheme.bodyMedium?.color, fontWeight: FontWeight.bold)),
+                Text(value, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
               ],
             ),
           ],
@@ -486,7 +486,7 @@ class _VisitorAlertCardState extends State<_VisitorAlertCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.grey.shade100),
       ),
@@ -507,7 +507,7 @@ class _VisitorAlertCardState extends State<_VisitorAlertCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(v.visitorName, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18, color: ThemeProvider.primaryNavy)),
+                      Text(v.visitorName, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18, color: Theme.of(context).colorScheme.primary)),
                       Text('Unit ${v.unitNumber} · ${v.residentName}', style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade500)),
                     ],
                   ),
@@ -592,7 +592,7 @@ class _LogCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(12)),
       child: Row(
         children: [
           Text(visitor.type.icon, style: const TextStyle(fontSize: 20)),
@@ -631,7 +631,7 @@ class _WalkInBottomSheetState extends State<_WalkInBottomSheet> {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 40),
-      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
       child: Form(
         key: _formKey,
         child: Column(

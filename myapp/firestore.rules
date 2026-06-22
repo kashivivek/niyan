@@ -40,6 +40,13 @@ service cloud.firestore {
          getMemberRole(societyId) == 'SocietyRole.committee');
     }
 
+    // Check if user has access to a property (as owner or co-owner)
+    function hasPropertyAccess(propertyId) {
+      let prop = get(/databases/$(database)/documents/properties/$(propertyId)).data;
+      return prop.ownerId == request.auth.uid ||
+        ('coOwnerIds' in prop && request.auth.uid in prop.coOwnerIds);
+    }
+
     // ───────────────────────────────────────────────
 
     // ─────────────────────────────────────────────────────────
@@ -76,21 +83,23 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────
     match /properties/{propertyId} {
       allow read: if isSignedIn() &&
-        resource.data.ownerId == request.auth.uid;
+        (resource.data.ownerId == request.auth.uid ||
+         ('coOwnerIds' in resource.data && request.auth.uid in resource.data.coOwnerIds));
       allow create: if isSignedIn() &&
         request.resource.data.ownerId == request.auth.uid;
       allow update, delete: if isSignedIn() &&
-        resource.data.ownerId == request.auth.uid;
+        (resource.data.ownerId == request.auth.uid ||
+         ('coOwnerIds' in resource.data && request.auth.uid in resource.data.coOwnerIds));
 
       // Units subcollection
       match /units/{unitId} {
         allow read, write: if isSignedIn() &&
-          get(/databases/$(database)/documents/properties/$(propertyId)).data.ownerId == request.auth.uid;
+          hasPropertyAccess(propertyId);
 
         // Tenancy history subcollection
         match /tenancyHistory/{historyId} {
           allow read, write: if isSignedIn() &&
-            get(/databases/$(database)/documents/properties/$(propertyId)).data.ownerId == request.auth.uid;
+            hasPropertyAccess(propertyId);
         }
       }
     }
@@ -100,9 +109,9 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────
     match /tenants/{tenantId} {
       allow read, write: if isSignedIn() &&
-        resource.data.ownerId == request.auth.uid;
+        hasPropertyAccess(resource.data.propertyId);
       allow create: if isSignedIn() &&
-        request.resource.data.ownerId == request.auth.uid;
+        hasPropertyAccess(request.resource.data.propertyId);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -110,9 +119,9 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────
     match /transactions/{transactionId} {
       allow read, write: if isSignedIn() &&
-        resource.data.ownerId == request.auth.uid;
+        hasPropertyAccess(resource.data.propertyId);
       allow create: if isSignedIn() &&
-        request.resource.data.ownerId == request.auth.uid;
+        hasPropertyAccess(request.resource.data.propertyId);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -120,9 +129,9 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────
     match /rentRecords/{recordId} {
       allow read, write: if isSignedIn() &&
-        resource.data.ownerId == request.auth.uid;
+        hasPropertyAccess(resource.data.propertyId);
       allow create: if isSignedIn() &&
-        request.resource.data.ownerId == request.auth.uid;
+        hasPropertyAccess(request.resource.data.propertyId);
     }
 
     // ─────────────────────────────────────────────────────────

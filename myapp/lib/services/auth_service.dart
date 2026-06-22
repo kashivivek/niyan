@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:myapp/models/user_model.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -150,10 +153,53 @@ class AuthService {
 
   Future<void> signOut() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('remember_me_email');
+      await prefs.remove('remember_me_password');
+      await prefs.setBool('remember_me_enabled', false);
       return await _auth.signOut();
     } catch (e) {
       debugPrint(e.toString());
       return;
+    }
+  }
+
+  static String _obfuscate(String text) => base64.encode(utf8.encode(text));
+  static String _deobfuscate(String text) => utf8.decode(base64.decode(text));
+
+  Future<void> saveRememberMeCredentials(String email, String password) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('remember_me_email', _obfuscate(email));
+      await prefs.setString('remember_me_password', _obfuscate(password));
+      await prefs.setBool('remember_me_enabled', true);
+    } catch (e) {
+      debugPrint('saveRememberMeCredentials error: $e');
+    }
+  }
+
+  Future<void> attemptAutoLogin() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final enabled = prefs.getBool('remember_me_enabled') ?? false;
+      if (!enabled) return;
+
+      if (_auth.currentUser != null) {
+        debugPrint('Auto-login: User is already logged in.');
+        return;
+      }
+
+      final emailObfuscated = prefs.getString('remember_me_email');
+      final passwordObfuscated = prefs.getString('remember_me_password');
+
+      if (emailObfuscated != null && passwordObfuscated != null) {
+        final email = _deobfuscate(emailObfuscated);
+        final password = _deobfuscate(passwordObfuscated);
+        debugPrint('Auto-login: Restoring session for $email');
+        await _auth.signInWithEmailAndPassword(email: email, password: password);
+      }
+    } catch (e) {
+      debugPrint('Auto-login failed: $e');
     }
   }
 
@@ -174,3 +220,4 @@ class AuthService {
     }
   }
 }
+

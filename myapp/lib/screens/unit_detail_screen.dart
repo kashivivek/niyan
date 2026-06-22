@@ -7,12 +7,11 @@ import 'package:myapp/models/user_model.dart';
 import 'package:myapp/models/transaction_model.dart';
 import 'package:myapp/models/tenancy_history_model.dart';
 import 'package:myapp/services/database_service.dart';
-import 'package:myapp/screens/edit_unit_screen.dart';
-import 'package:myapp/screens/add_transaction_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:myapp/providers/theme_provider.dart';
 import 'package:myapp/utils/currency_helper.dart';
 import 'package:go_router/go_router.dart';
+import 'package:rxdart/rxdart.dart';
 
 class UnitDetailScreen extends StatelessWidget {
   final UnitModel? unit;
@@ -40,17 +39,17 @@ class UnitDetailScreen extends StatelessWidget {
             title: Text('Unit ${currentUnit.unitNumber}'),
             actions: [
               IconButton(
-                icon: const Icon(Icons.edit_outlined),
+                icon: Icon(Icons.edit_outlined),
                 onPressed: () => context.push('/property/${currentUnit.propertyId}/unit/${currentUnit.id}/edit', extra: currentUnit),
               ),
               IconButton(
-                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                icon: Icon(Icons.delete_outline, color: Colors.redAccent),
                 onPressed: () => _confirmDelete(context, databaseService, currentUnit),
               ),
             ],
           ),
           body: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
+            padding: EdgeInsets.all(24.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -65,11 +64,13 @@ class UnitDetailScreen extends StatelessWidget {
               ],
             ),
           ),
-          floatingActionButton: FloatingActionButton.extended(
-            backgroundColor: ThemeProvider.accentBlue,
-            icon: const Icon(Icons.add_rounded, color: Colors.white),
-            label: const Text('Add Transaction', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            onPressed: () => context.push('/property/${currentUnit.propertyId}/unit/${currentUnit.id}/transaction/add', extra: currentUnit),
+          floatingActionButton: Padding(
+            padding: EdgeInsets.only(bottom: 80.0),
+            child: FloatingActionButton.extended(
+              icon: Icon(Icons.add_rounded, color: Colors.white),
+              label: Text('Add Transaction', style: TextStyle(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold)),
+              onPressed: () => context.push('/property/${currentUnit.propertyId}/unit/${currentUnit.id}/transaction/add', extra: currentUnit),
+            ),
           ),
         );
       }
@@ -78,9 +79,9 @@ class UnitDetailScreen extends StatelessWidget {
 
   Widget _buildUnitInfoCard(BuildContext context, UnitModel unit, String? currency) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10)),
@@ -116,8 +117,8 @@ class UnitDetailScreen extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 11, fontWeight: FontWeight.bold)),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text(label, style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+            Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           ],
         ),
       ],
@@ -127,7 +128,7 @@ class UnitDetailScreen extends StatelessWidget {
   Widget _buildStatusBadge(String status) {
     final isOccupied = status == 'occupied';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: (isOccupied ? Colors.green : Colors.blue).withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
@@ -141,18 +142,18 @@ class UnitDetailScreen extends StatelessWidget {
 
   Widget _buildTenantInfo(BuildContext context, UnitModel unit, DatabaseService databaseService) {
     final user = Provider.of<UserModel?>(context);
-    if (unit.currentTenantId == null) return _buildAssignTenantSection(context, unit, databaseService);
+    if (unit.currentTenantId == null) return _buildAssignTenantSection(context, unit, databaseService, user?.currency);
 
     return StreamBuilder<TenantModel?>(
-      stream: databaseService.getTenants(unit.ownerId).map((list) => list.firstWhere((t) => t.id == unit.currentTenantId)),
+      stream: databaseService.getTenant(unit.currentTenantId!),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final tenant = snapshot.data!;
 
         return Container(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10)),
@@ -164,8 +165,8 @@ class UnitDetailScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Current Tenant', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
-                  Text(CurrencyHelper.format(unit.monthlyRent, user?.currency), style: const TextStyle(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                  Text('Current Tenant', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+                  Text(CurrencyHelper.format(unit.monthlyRent, user?.currency), style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                   TextButton(
                     onPressed: () => _confirmMoveOut(context, databaseService, unit, tenant),
                     child: const Text('Move Out', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
@@ -181,19 +182,19 @@ class UnitDetailScreen extends StatelessWidget {
                       radius: 24,
                       backgroundColor: ThemeProvider.accentBlue.withOpacity(0.1),
                       backgroundImage: tenant.photoUrl != null ? NetworkImage(tenant.photoUrl!) : null,
-                      child: tenant.photoUrl == null ? const Icon(Icons.person_rounded, color: ThemeProvider.accentBlue) : null,
+                      child: tenant.photoUrl == null ? Icon(Icons.person_rounded, color: ThemeProvider.accentBlue) : null,
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(tenant.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          Text(tenant.phoneNumber ?? 'No phone', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                          Text(tenant.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text(tenant.phoneNumber ?? 'No phone', style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color, fontSize: 13)),
                         ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                    Icon(Icons.chevron_right_rounded, color: Colors.grey),
                   ],
                 ),
               ),
@@ -204,34 +205,111 @@ class UnitDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAssignTenantSection(BuildContext context, UnitModel unit, DatabaseService databaseService) {
+  Widget _buildAssignTenantSection(BuildContext context, UnitModel unit, DatabaseService databaseService, String? currency) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: ThemeProvider.accentBlue.withOpacity(0.3), width: 1),
       ),
       child: Column(
         children: [
-          const Icon(Icons.person_add_alt_1_rounded, size: 48, color: ThemeProvider.accentBlue),
+          Icon(Icons.person_add_alt_1_rounded, size: 48, color: ThemeProvider.accentBlue),
           const SizedBox(height: 16),
           const Text('No Tenant Assigned', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           const SizedBox(height: 8),
           Text('Assign a tenant to start tracking rent and transactions.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade600)),
           const SizedBox(height: 24),
-          StreamBuilder<List<TenantModel>>(
-            stream: databaseService.getTenants(unit.ownerId),
+          StreamBuilder<Map<String, dynamic>>(
+            stream: CombineLatestStream.combine2(
+              databaseService.getTenants(unit.ownerId),
+              databaseService.allUnitsWithPropertyInfo(unit.ownerId),
+              (List<TenantModel> tenants, List<Map<String, dynamic>> unitsInfo) => {
+                'tenants': tenants,
+                'unitsInfo': unitsInfo,
+              },
+            ),
             builder: (context, snapshot) {
-              final availableTenants = (snapshot.data ?? []).where((t) => !t.isAssignedToUnit).toList();
-              if (availableTenants.isEmpty) return const Text('No unassigned tenants available.');
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final tenants = snapshot.data?['tenants'] as List<TenantModel>? ?? [];
+              final unitsInfo = snapshot.data?['unitsInfo'] as List<Map<String, dynamic>>? ?? [];
+
+              // Map each tenant ID to their assigned locations
+              final tenantAssignments = <String, List<String>>{};
+              for (var info in unitsInfo) {
+                final u = info['unit'] as UnitModel;
+                final propName = info['propertyName'] as String;
+                final tenantId = u.currentTenantId;
+                if (tenantId != null && tenantId.isNotEmpty) {
+                  tenantAssignments.putIfAbsent(tenantId, () => []).add('$propName - ${u.unitNumber}');
+                }
+              }
 
               return DropdownButtonFormField<String>(
-                decoration: const InputDecoration(labelText: 'Assign Tenant', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'Assign Tenant',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
                 hint: const Text('Select a Tenant...'),
-                items: availableTenants.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))).toList(),
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: 'CREATE_NEW',
+                    child: Text(
+                      '+ Create New Tenant...',
+                      style: TextStyle(color: ThemeProvider.accentBlue, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  ...tenants.map((t) {
+                    final locations = tenantAssignments[t.id];
+                    final hasAssignment = locations != null && locations.isNotEmpty;
+
+                    return DropdownMenuItem<String>(
+                      value: t.id,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              t.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (hasAssignment) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.teal.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                locations.join(', '),
+                                style: TextStyle(color: Colors.teal.shade700, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }),
+                ],
                 onChanged: (tenantId) {
-                  if (tenantId != null) databaseService.assignTenantToUnit(unitId: unit.id, tenantId: tenantId, propertyId: unit.propertyId, ownerId: unit.ownerId);
+                  if (tenantId == 'CREATE_NEW') {
+                    context.push('/tenants/add?propertyId=${unit.propertyId}&unitId=${unit.id}');
+                  } else if (tenantId != null) {
+                    final selectedTenant = tenants.firstWhere((t) => t.id == tenantId);
+                    _showAssignTenantDialog(
+                      context,
+                      unit,
+                      selectedTenant,
+                      databaseService,
+                      currency,
+                    );
+                  }
                 },
               );
             },
@@ -251,16 +329,16 @@ class UnitDetailScreen extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Previous Tenants', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+            Text('Previous Tenants', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
             const SizedBox(height: 12),
             ...history.map((h) => FutureBuilder<TenantModel?>(
               future: databaseService.getTenantFuture(h.tenantId),
               builder: (context, tSnap) {
                 final tenantName = tSnap.data?.name ?? 'Loading...';
                 return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: EdgeInsets.only(bottom: 8),
                   child: ListTile(
-                    leading: const Icon(Icons.history_rounded, color: Colors.grey),
+                    leading: Icon(Icons.history_rounded, color: Colors.grey),
                     title: Text(tenantName),
                     subtitle: Text('${DateFormat('MMM yyyy').format(h.startDate)} - ${DateFormat('MMM yyyy').format(h.endDate!)}'),
                   ),
@@ -277,12 +355,12 @@ class UnitDetailScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Recent Transactions', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+        Text('Recent Transactions', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
         const SizedBox(height: 12),
         StreamBuilder<List<TransactionModel>>(
           stream: databaseService.getTransactionsForUnit(unit.id),
           builder: (context, snapshot) {
-            if (!snapshot.hasData || snapshot.data!.isEmpty) return Center(child: Padding(padding: const EdgeInsets.all(32), child: Text('No transactions yet.', style: TextStyle(color: Colors.grey.shade400))));
+            if (!snapshot.hasData || snapshot.data!.isEmpty) return Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No transactions yet.', style: TextStyle(color: Colors.grey.shade400))));
 
             final txs = snapshot.data!.take(5).toList();
             return ListView.builder(
@@ -293,9 +371,9 @@ class UnitDetailScreen extends StatelessWidget {
                 final tx = txs[index];
                 final isIncome = tx.type == TransactionType.income;
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)),
+                  margin: EdgeInsets.only(bottom: 12),
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)),
                   child: Row(
                     children: [
                       Icon(isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, color: isIncome ? Colors.green : Colors.redAccent),
@@ -304,8 +382,8 @@ class UnitDetailScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(tx.description, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            Text(DateFormat('MMM dd, yyyy').format(tx.date), style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                            Text(tx.description, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            Text(DateFormat('MMM dd, yyyy').format(tx.date), style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color, fontSize: 12)),
                           ],
                         ),
                       ),
@@ -359,6 +437,165 @@ class UnitDetailScreen extends StatelessWidget {
           }, child: const Text('Delete', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold))),
         ],
       ),
+    );
+  }
+
+  void _showAssignTenantDialog(
+    BuildContext context,
+    UnitModel unit,
+    TenantModel tenant,
+    DatabaseService databaseService,
+    String? currency,
+  ) {
+    final moveIn = tenant.moveInDate;
+    final dueDay = unit.rentDueDate;
+    
+    // Calculate first due date after move-in date
+    DateTime nextDue;
+    if (moveIn.day < dueDay) {
+      nextDue = DateTime(moveIn.year, moveIn.month, dueDay);
+    } else {
+      nextDue = DateTime(moveIn.year, moveIn.month + 1, dueDay);
+    }
+    
+    final daysDiff = nextDue.difference(moveIn).inDays;
+    final daysInMonth = DateTime(moveIn.year, moveIn.month + 1, 0).day;
+    final dailyRate = unit.monthlyRent / daysInMonth;
+    final calculatedProrated = dailyRate * daysDiff;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        bool applyProration = daysDiff > 0;
+        final amountController = TextEditingController(
+          text: calculatedProrated.toStringAsFixed(2),
+        );
+        DateTime proratedDueDate = nextDue;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text(
+                'Assign ${tenant.name}',
+                style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Unit Number: ${unit.unitNumber}', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Text('Move-In Date: ${DateFormat('MMM dd, yyyy').format(moveIn)}'),
+                    Text('Monthly Rent: ${CurrencyHelper.format(unit.monthlyRent, currency)}'),
+                    Text('Rent Due Day: Day $dueDay of the month'),
+                    const Divider(height: 24),
+                    if (daysDiff > 0) ...[
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: applyProration,
+                            onChanged: (val) {
+                              setState(() {
+                                applyProration = val ?? false;
+                              });
+                            },
+                          ),
+                          const Expanded(
+                            child: Text(
+                              'Charge prorated rent for partial first month',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (applyProration) ...[
+                        const SizedBox(height: 8),
+                        Text('Prorated Period: ${DateFormat('MMM dd').format(moveIn)} to ${DateFormat('MMM dd').format(nextDue)} ($daysDiff days)'),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: amountController,
+                          decoration: InputDecoration(
+                            labelText: 'Prorated Amount (${currency ?? '\$'})',
+                            border: const OutlineInputBorder(),
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        ),
+                        const SizedBox(height: 12),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Prorated Due Date', style: TextStyle(fontSize: 14)),
+                          subtitle: Text(DateFormat('MMM dd, yyyy').format(proratedDueDate)),
+                          trailing: Icon(Icons.calendar_today, size: 18),
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: proratedDueDate,
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2101),
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                proratedDueDate = picked;
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ] else ...[
+                      const Text(
+                        'Move-in date is on the rent due day. No proration needed; full monthly rent will start immediately.',
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ThemeProvider.primaryNavy,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () async {
+                    final proratedAmt = applyProration
+                        ? double.tryParse(amountController.text)
+                        : null;
+                    
+                    final navigator = Navigator.of(context);
+                    final messenger = ScaffoldMessenger.of(context);
+
+                    try {
+                      await databaseService.assignTenantToUnit(
+                        unitId: unit.id,
+                        tenantId: tenant.id,
+                        propertyId: unit.propertyId,
+                        ownerId: unit.ownerId,
+                        proratedAmount: proratedAmt,
+                        proratedDueDate: applyProration ? proratedDueDate : null,
+                      );
+                      navigator.pop();
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('Tenant assigned successfully!')),
+                      );
+                    } catch (e) {
+                      messenger.showSnackBar(
+                        SnackBar(content: Text('Assignment failed: $e')),
+                      );
+                    }
+                  },
+                  child: const Text('Assign & Save', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

@@ -26,7 +26,7 @@ class VibrantDashboardTile extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
@@ -35,7 +35,7 @@ class VibrantDashboardTile extends StatelessWidget {
               offset: const Offset(0, 8),
             ),
           ],
-          border: Border.all(color: Colors.grey.shade100, width: 1),
+          border: Border.all(color: Theme.of(context).dividerColor, width: 1),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
@@ -81,7 +81,7 @@ class VibrantDashboardTile extends StatelessWidget {
                               ),
                             ],
                           ),
-                          child: Icon(icon, color: Colors.white, size: 28),
+                          child: Icon(icon, color: Theme.of(context).cardColor, size: 28),
                         ),
                         if (badgeText != null)
                           Container(
@@ -92,8 +92,8 @@ class VibrantDashboardTile extends StatelessWidget {
                             ),
                             child: Text(
                               badgeText!,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: Theme.of(context).cardColor,
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -110,7 +110,7 @@ class VibrantDashboardTile extends StatelessWidget {
                           style: GoogleFonts.outfit(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: ThemeProvider.primaryNavy,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                         if (subtitle != null)
@@ -120,7 +120,7 @@ class VibrantDashboardTile extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.inter(
                               fontSize: 12,
-                              color: Colors.grey.shade500,
+                              color: Theme.of(context).textTheme.bodyMedium?.color,
                             ),
                           ),
                       ],

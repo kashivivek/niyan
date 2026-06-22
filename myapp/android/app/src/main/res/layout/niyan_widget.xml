@@ -6,26 +6,53 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <TextView
-        android:id="@+id/widget_title"
-        android:layout_width="wrap_content"
+    <!-- Widget header -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Niyan Portfolio"
-        android:textColor="#FFFFFF"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-    <View
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Pending Rents"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/last_updated"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Updated now"
+            android:textColor="#80FFFFFF"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+    <!-- Divider -->
+    <TextView
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_marginTop="8dp"
         android:layout_marginBottom="8dp"
         android:background="#33FFFFFF" />
 
+    <!-- Overdue section -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="6dp">
+
+        <!-- Accent bar using TextView (View is not RemoteViews-safe) -->
+        <TextView
+            android:layout_width="4dp"
+            android:layout_height="34dp"
+            android:background="#FF5252"
+            android:layout_marginEnd="10dp" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -34,53 +61,90 @@
             android:orientation="vertical">
 
             <TextView
-                android:id="@+id/overdue_count"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="0"
+                android:text="OVERDUE"
                 android:textColor="#FF5252"
-                android:textSize="22sp"
+                android:textSize="8sp"
                 android:textStyle="bold" />
 
             <TextView
-                android:layout_width="wrap_content"
+                android:id="@+id/overdue_details"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Overdue"
-                android:textColor="#BDBDBD"
-                android:textSize="10sp" />
+                android:text="No overdue rents"
+                android:textColor="#CCFFFFFF"
+                android:textSize="11sp"
+                android:maxLines="3"
+                android:ellipsize="end" />
         </LinearLayout>
 
-        <LinearLayout
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/overdue_count"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/upcoming_count"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0"
-                android:textColor="#448AFF"
-                android:textSize="22sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Upcoming"
-                android:textColor="#BDBDBD"
-                android:textSize="10sp" />
-        </LinearLayout>
+            android:text="0"
+            android:textColor="#FF5252"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginStart="8dp" />
     </LinearLayout>
 
+    <!-- Divider -->
     <TextView
-        android:id="@+id/last_updated"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginBottom="6dp"
+        android:background="#22FFFFFF" />
+
+    <!-- Upcoming section -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="Updated just now"
-        android:textColor="#80FFFFFF"
-        android:textSize="9sp" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <!-- Accent bar using TextView -->
+        <TextView
+            android:layout_width="4dp"
+            android:layout_height="34dp"
+            android:background="#448AFF"
+            android:layout_marginEnd="10dp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="UPCOMING"
+                android:textColor="#448AFF"
+                android:textSize="8sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/upcoming_details"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="No upcoming rents"
+                android:textColor="#CCFFFFFF"
+                android:textSize="11sp"
+                android:maxLines="3"
+                android:ellipsize="end" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/upcoming_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0"
+            android:textColor="#448AFF"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
 
 </LinearLayout>

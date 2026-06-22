@@ -97,8 +97,12 @@ class NotificationService {
   }
 
   Future<void> cancelAllNotifications() async {
-    if (kIsWeb) return;
-    await _flutterLocalNotificationsPlugin.cancelAll();
+    if (kIsWeb || !_isInitialized) return;
+    try {
+      await _flutterLocalNotificationsPlugin.cancelAll();
+    } catch (e) {
+      developer.log('Failed to cancel notifications', error: e);
+    }
   }
 
   Future<void> showImmediateNotification(String title, String body) async {
@@ -168,7 +172,35 @@ class NotificationService {
     });
   }
 
-  Future<void> scheduleRentReminders(List<ActionItem> actionItems, String timeStr, String timezoneStr, String frequency) async {
+  Future<void> _persistNotification(String ownerId, String title, String body, ActionItem item) async {
+    // Use a deterministic key to avoid duplicates
+    final key = '${item.tenant.id}_${item.month}_rent_reminder';
+    final existing = await FirebaseFirestore.instance
+        .collection('notifications')
+        .where('ownerId', isEqualTo: ownerId)
+        .where('dedupeKey', isEqualTo: key)
+        .limit(1)
+        .get();
+    if (existing.docs.isNotEmpty) return; // Already persisted
+
+    await FirebaseFirestore.instance.collection('notifications').add({
+      'ownerId': ownerId,
+      'title': title,
+      'body': body,
+      'type': 'general',
+      'data': {
+        'tenantId': item.tenant.id,
+        'propertyId': item.propertyId,
+        'unitId': item.unitId,
+        'month': item.month,
+      },
+      'isRead': false,
+      'createdAt': FieldValue.serverTimestamp(),
+      'dedupeKey': key,
+    });
+  }
+
+  Future<void> scheduleRentReminders(List<ActionItem> actionItems, String timeStr, String timezoneStr, String frequency, {String? ownerId}) async {
     if (kIsWeb) return;
 
     await cancelAllNotifications(); // Clear existing
@@ -239,6 +271,10 @@ class NotificationService {
           matchDateTimeComponents: frequency == 'Daily' ? DateTimeComponents.time : 
                                    (frequency == 'Weekly' ? DateTimeComponents.dayOfWeekAndTime : null),
         );
+        // Persist to Firestore so it shows in the Alerts tab
+        if (ownerId != null) {
+          await _persistNotification(ownerId, title, body, item);
+        }
       } catch (e) {
         developer.log('Error scheduling notification for ${item.tenant.name}', error: e);
       }
