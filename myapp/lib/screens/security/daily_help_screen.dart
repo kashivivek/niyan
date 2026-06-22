@@ -32,7 +32,7 @@ class _DailyHelpScreenState extends State<DailyHelpScreen> {
     final stream = visitorService.getDailyHelpByUnit(user.uid);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Daily Help',
             style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
@@ -50,11 +50,11 @@ class _DailyHelpScreenState extends State<DailyHelpScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddStaffSheet(context, user, appMode),
-        backgroundColor: ThemeProvider.accentBlue,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark ? ThemeProvider.accentTeal : ThemeProvider.accentBlue,
         icon: const Icon(Icons.person_add_rounded, color: Colors.white),
         label: Text('Add Staff',
             style: GoogleFonts.outfit(
-                color: Colors.white, fontWeight: FontWeight.w600)),
+                color: Theme.of(context).cardColor, fontWeight: FontWeight.w600)),
       ),
       body: StreamBuilder<List<DailyHelpModel>>(
         stream: stream,
@@ -160,7 +160,7 @@ class _StaffCardState extends State<_StaffCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade100),
         boxShadow: [
@@ -206,7 +206,7 @@ class _StaffCardState extends State<_StaffCard> {
                             style: GoogleFonts.outfit(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 15,
-                                color: ThemeProvider.primaryNavy)),
+                                color: Theme.of(context).colorScheme.primary)),
                         Text(staff.category.label,
                             style: GoogleFonts.inter(
                                 fontSize: 12, color: Colors.grey.shade500)),
@@ -371,7 +371,7 @@ class _AttendanceCalendar extends StatelessWidget {
         Text(DateFormat('MMMM yyyy').format(date),
             style: GoogleFonts.outfit(
                 fontWeight: FontWeight.w600,
-                color: ThemeProvider.primaryNavy)),
+                color: Theme.of(context).colorScheme.primary)),
         const SizedBox(height: 12),
         Wrap(
           spacing: 6,
@@ -619,7 +619,7 @@ class _AddStaffSheetState extends State<_AddStaffSheet> {
                 style: GoogleFonts.outfit(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
-                    color: ThemeProvider.primaryNavy)),
+                    color: Theme.of(context).colorScheme.primary)),
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
@@ -692,7 +692,7 @@ class _AddStaffSheetState extends State<_AddStaffSheet> {
                             strokeWidth: 2, color: Colors.white))
                     : Text('Register',
                         style: GoogleFonts.outfit(
-                            color: Colors.white,
+                            color: Theme.of(context).cardColor,
                             fontWeight: FontWeight.w600,
                             fontSize: 16)),
               ),

@@ -25,6 +25,7 @@ class EditTenantScreenState extends State<EditTenantScreen> {
   late TextEditingController _altPhoneController;
   late TextEditingController _depositController;
   DateTime? _moveInDate;
+  DateTime? _rentTrackingStartDate;
   XFile? _image;
   final ImagePicker _picker = ImagePicker();
 
@@ -36,6 +37,7 @@ class EditTenantScreenState extends State<EditTenantScreen> {
     _altPhoneController = TextEditingController(text: widget.tenant.alternatePhone ?? '');
     _depositController = TextEditingController(text: widget.tenant.securityDeposit.toString());
     _moveInDate = widget.tenant.moveInDate;
+    _rentTrackingStartDate = widget.tenant.rentTrackingStartDate ?? widget.tenant.moveInDate;
   }
 
   Future<void> _pickImage() async {
@@ -57,6 +59,21 @@ class EditTenantScreenState extends State<EditTenantScreen> {
     if (picked != null) {
       setState(() {
         _moveInDate = picked;
+        _rentTrackingStartDate ??= picked;
+      });
+    }
+  }
+
+  Future<void> _selectTrackingDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _rentTrackingStartDate ?? _moveInDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null) {
+      setState(() {
+        _rentTrackingStartDate = picked;
       });
     }
   }
@@ -76,6 +93,7 @@ class EditTenantScreenState extends State<EditTenantScreen> {
         alternatePhone: _altPhoneController.text.isNotEmpty ? _altPhoneController.text : null,
         moveInDate: _moveInDate!,
         securityDeposit: double.tryParse(_depositController.text) ?? widget.tenant.securityDeposit,
+        rentTrackingStartDate: _rentTrackingStartDate ?? _moveInDate,
       );
 
       try {
@@ -180,6 +198,15 @@ class EditTenantScreenState extends State<EditTenantScreen> {
                       : DateFormat('MMM dd, yyyy').format(_moveInDate!)),
                   trailing: const Icon(Icons.calendar_today),
                   onTap: () => _selectDate(context),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  title: const Text('Start Rent Tracking From'),
+                  subtitle: Text(_rentTrackingStartDate == null
+                      ? 'Same as Move-In Date'
+                      : DateFormat('MMM dd, yyyy').format(_rentTrackingStartDate!)),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () => _selectTrackingDate(context),
                 ),
                 const SizedBox(height: 32),
                 ElevatedButton(

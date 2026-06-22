@@ -32,7 +32,7 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
     final isDesktop = MediaQuery.of(context).size.width > 900;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: isDesktop ? 960 : double.infinity),
@@ -40,11 +40,11 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
         children: [
           // View Mode Toggle
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: Container(
-              padding: const EdgeInsets.all(4),
+              padding: EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.grey.shade200),
               ),
@@ -67,12 +67,12 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
       ),
       ),
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 90),
+        padding: EdgeInsets.only(bottom: 90),
         child: FloatingActionButton.extended(
           onPressed: () => context.push('/properties/add'),
-          backgroundColor: ThemeProvider.primaryNavy,
-          icon: const Icon(Icons.add_rounded, color: Colors.white),
-          label: Text('Add Property', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+          backgroundColor: Theme.of(context).brightness == Brightness.dark ? ThemeProvider.accentTeal : ThemeProvider.primaryNavy,
+          icon: Icon(Icons.add_rounded, color: Colors.white),
+          label: Text('Add Property', style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold)),
         ),
       ),
     );
@@ -85,7 +85,7 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
         onTap: () => setState(() => _viewMode = mode),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: isSelected ? ThemeProvider.primaryNavy : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
@@ -94,7 +94,7 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: 18, color: isSelected ? Colors.white : Colors.grey),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text(
                 label,
                 style: GoogleFonts.outfit(
@@ -123,7 +123,7 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
         if (properties.isEmpty) return _buildEmptyState('No properties found');
 
         return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
+          padding: EdgeInsets.fromLTRB(24, 8, 24, 120),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: isDesktop ? 2 : 1,
             crossAxisSpacing: 20,
@@ -140,34 +140,29 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
   Widget _buildUnitsGrid(DatabaseService db, String userId, bool isDesktop) {
     final appMode = Provider.of<AppModeProvider>(context, listen: false);
     final stream = appMode.isSocietyMode && appMode.activeSociety != null
-        ? db.getSocietyUnits(appMode.activeSociety!.id)
-        : db.allUnits(userId);
+        ? db.societyUnitsWithPropertyInfo(appMode.activeSociety!.id)
+        : db.allUnitsWithPropertyInfo(userId);
 
-    return StreamBuilder<List<UnitModel>>(
+    return StreamBuilder<List<Map<String, dynamic>>>(
       stream: stream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        final units = snapshot.data ?? [];
+        if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
+        final unitMaps = snapshot.data ?? [];
         
-        if (units.isEmpty) return _buildEmptyState('No units found');
+        if (unitMaps.isEmpty) return _buildEmptyState('No units found');
 
         return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
+          padding: EdgeInsets.fromLTRB(24, 8, 24, 120),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: isDesktop ? 4 : 2,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
             childAspectRatio: 1,
           ),
-          itemCount: units.length,
+          itemCount: unitMaps.length,
           itemBuilder: (context, index) {
-            final u = units[index];
-            return _UnitGridCard(unit: {
-              'unit': u,
-              'propertyName': 'Property', // Ideally fetched or stored in unit
-              'propertyId': u.propertyId,
-              'propertyAddress': 'Address',
-            });
+            return _UnitGridCard(unit: unitMaps[index]);
           },
         );
       },
@@ -195,8 +190,15 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.house_siding_rounded, size: 64, color: Colors.grey.shade200),
-          const SizedBox(height: 16),
+          Image.asset(
+            'assets/images/logo_icon.png',
+            height: 64,
+            width: 64,
+            color: Theme.of(context).dividerColor,
+            colorBlendMode: BlendMode.srcIn,
+            errorBuilder: (context, error, stackTrace) => Icon(Icons.business_rounded, size: 64, color: Color(0xFFE5E7EB)),
+          ),
+          SizedBox(height: 16),
           Text(message, style: GoogleFonts.outfit(fontSize: 16, color: Colors.grey.shade400)),
         ],
       ),
@@ -219,7 +221,7 @@ class _UnitGridCard extends StatelessWidget {
       onTap: () => context.push('/property/${unit['propertyId']}/unit/${u.id}', extra: u),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
@@ -265,7 +267,7 @@ class _UnitGridCard extends StatelessWidget {
                       style: GoogleFonts.outfit(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Theme.of(context).cardColor,
                       ),
                     ),
                     Text(
@@ -284,7 +286,7 @@ class _UnitGridCard extends StatelessWidget {
                 top: 8,
                 right: 8,
                 child: Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.9),
                     shape: BoxShape.circle,
@@ -312,50 +314,50 @@ class _PropertyMapCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final mapUrl = 'https://maps.googleapis.com/maps/api/staticmap?center=${Uri.encodeComponent('${property.address},${property.city}')}&zoom=15&size=600x300&maptype=roadmap&markers=color:red%7Clabel:P%7C${Uri.encodeComponent('${property.address},${property.city}')}&key=AIzaSyDecNKEtkvBJ5tojkOlWVI4CvaLRQMTFKo';
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Image.network(
-                mapUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  color: Colors.grey.shade200,
-                  child: const Center(child: Icon(Icons.map_outlined, color: Colors.grey)),
-                ),
-              ),
-            ),
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withOpacity(0.05),
-                      Colors.black.withOpacity(0.7),
-                    ],
+    return GestureDetector(
+      onTap: () {
+        context.read<AppModeProvider>().setLastViewedProperty(property.id);
+        context.push('/property/${property.id}', extra: property);
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Image.network(
+                  mapUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: Theme.of(context).dividerColor,
+                    child: const Center(child: Icon(Icons.map_outlined, color: Colors.grey)),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 16,
-              child: InkWell(
-                onTap: () {
-                  context.read<AppModeProvider>().setLastViewedProperty(property.id);
-                  context.push('/property/${property.id}', extra: property);
-                },
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.05),
+                        Colors.black.withOpacity(0.7),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 16,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -363,19 +365,34 @@ class _PropertyMapCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            property.name,
-                            style: GoogleFonts.outfit(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
                           Row(
                             children: [
-                              const Icon(Icons.location_on_rounded, color: ThemeProvider.accentTeal, size: 12),
-                              const SizedBox(width: 4),
+                              Text(
+                                property.name,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).cardColor,
+                                ),
+                              ),
+                              if (context.read<AuthService>().currentUser?.uid != property.ownerId) ...[
+                                SizedBox(width: 8),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white24,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text('Shared', style: TextStyle(color: Theme.of(context).cardColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ],
+                          ),
+                          SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(Icons.location_on_rounded, color: ThemeProvider.accentTeal, size: 12),
+                              SizedBox(width: 4),
                               Expanded(
                                 child: Text(
                                   property.address,
@@ -393,18 +410,18 @@ class _PropertyMapCard extends StatelessWidget {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: ThemeProvider.accentTeal,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 20),
+                      child: Icon(Icons.chevron_right_rounded, color: Theme.of(context).cardColor, size: 20),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

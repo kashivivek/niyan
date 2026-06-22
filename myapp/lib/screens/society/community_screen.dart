@@ -66,14 +66,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
     final canManagePosts = isAdmin || isManager;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9), // Lighter slate background
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Lighter slate background
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 90),
         child: FloatingActionButton.extended(
           onPressed: () => _showCreatePostDialog(context, user, membership, appMode.activeSociety!.id),
-          backgroundColor: ThemeProvider.primaryNavy,
+          backgroundColor: Theme.of(context).brightness == Brightness.dark ? ThemeProvider.accentTeal : ThemeProvider.primaryNavy,
           icon: const Icon(Icons.add_rounded, color: Colors.white),
-          label: Text('Post', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+          label: Text('Post', style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold)),
         ),
       ),
       body: CustomScrollView(
@@ -154,8 +154,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
           builder: (context, setModalState) {
             return Container(
               height: MediaQuery.of(context).size.height * 0.8,
-              decoration: const BoxDecoration(
-                color: Colors.white,
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
@@ -234,7 +234,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                 child: CircleAvatar(
                                   backgroundColor: Colors.black.withOpacity(0.5),
                                   child: IconButton(
-                                    icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                                    icon: Icon(Icons.close, color: Theme.of(context).cardColor, size: 20),
                                     onPressed: () {
                                       setModalState(() => _selectedImage = null);
                                       setState(() => _selectedImage = null);
@@ -262,12 +262,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               setState(() => _selectedImage = File(pickedFile.path));
                             }
                           },
-                          icon: const Icon(Icons.image_outlined, color: ThemeProvider.primaryNavy),
+                          icon: Icon(Icons.image_outlined, color: Theme.of(context).colorScheme.primary),
                           tooltip: 'Add Photo',
                         ),
                         IconButton(
                           onPressed: () {}, // Future: Polls
-                          icon: const Icon(Icons.poll_outlined, color: ThemeProvider.primaryNavy),
+                          icon: Icon(Icons.poll_outlined, color: Theme.of(context).colorScheme.primary),
                         ),
                       ],
                     ),
@@ -296,7 +296,7 @@ class _CommunityPostCard extends StatelessWidget {
       onTap: () => context.push('/community/post/${post.id}'),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.grey.shade200),
         ),
@@ -310,14 +310,14 @@ class _CommunityPostCard extends StatelessWidget {
                   CircleAvatar(
                     radius: 22,
                     backgroundColor: ThemeProvider.primaryNavy.withOpacity(0.05),
-                    child: Text(post.authorName[0], style: const TextStyle(color: ThemeProvider.primaryNavy, fontWeight: FontWeight.bold)),
+                    child: Text(post.authorName[0], style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(post.authorName, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15, color: ThemeProvider.primaryNavy)),
+                        Text(post.authorName, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15, color: Theme.of(context).colorScheme.primary)),
                         Text(DateFormat('MMM d • HH:mm').format(post.createdAt), style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
                       ],
                     ),
@@ -334,7 +334,7 @@ class _CommunityPostCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Text(
                 post.caption, 
-                style: GoogleFonts.inter(fontSize: 15, color: ThemeProvider.primaryNavy, height: 1.4)
+                style: GoogleFonts.inter(fontSize: 15, color: Theme.of(context).colorScheme.primary, height: 1.4)
               ),
             ),
             if (post.imageUrl != null) ...[
@@ -348,7 +348,7 @@ class _CommunityPostCard extends StatelessWidget {
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => Container(
                     height: 200,
-                    color: Colors.grey.shade100,
+                    color: Theme.of(context).dividerColor,
                     child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
                   ),
                 ),
@@ -369,14 +369,14 @@ class _CommunityPostCard extends StatelessWidget {
                   _ActionButton(
                     icon: Icons.mode_comment_outlined,
                     label: '${post.commentCount}',
-                    color: Colors.grey.shade600,
+                    color: Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white,
                     onTap: () => context.push('/community/post/${post.id}'),
                   ),
                   const Spacer(),
                   _ActionButton(
                     icon: Icons.share_outlined,
                     label: 'Share',
-                    color: Colors.grey.shade600,
+                    color: Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white,
                     onTap: () {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Post link copied!')));
                     },

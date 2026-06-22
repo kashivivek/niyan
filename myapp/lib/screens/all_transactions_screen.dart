@@ -32,7 +32,8 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_monthScrollController.hasClients) {
         // Scroll to the end (current month is the last in the reversed list)
-        _monthScrollController.jumpTo(_monthScrollController.position.maxScrollExtent);
+        _monthScrollController
+            .jumpTo(_monthScrollController.position.maxScrollExtent);
       }
     });
   }
@@ -45,46 +46,56 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     final user = Provider.of<UserModel?>(context);
-    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    final databaseService =
+        Provider.of<DatabaseService>(context, listen: false);
 
-    if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (user == null)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     final stream = CombineLatestStream.combine4(
       databaseService.allTransactions(user.uid),
       databaseService.getProperties(user.uid),
       databaseService.allUnits(user.uid),
       databaseService.getTenants(user.uid),
-      (List<TransactionModel> txs, List<PropertyModel> props, List<UnitModel> units, List<TenantModel> tenants) {
+      (List<TransactionModel> txs, List<PropertyModel> props,
+          List<UnitModel> units, List<TenantModel> tenants) {
         final propMap = {for (var p in props) p.id: p};
         final unitMap = {for (var u in units) u.id: u};
         final tenantMap = {for (var t in tenants) t.id: t};
 
         // Filter by month
-        var filteredTxs = txs.where((tx) => tx.date.year == _selectedMonth.year && tx.date.month == _selectedMonth.month);
+        var filteredTxs = txs.where((tx) =>
+            tx.date.year == _selectedMonth.year &&
+            tx.date.month == _selectedMonth.month);
 
         // Filter by property
         if (_selectedPropertyIds.isNotEmpty) {
-          filteredTxs = filteredTxs.where((tx) => _selectedPropertyIds.contains(tx.propertyId));
+          filteredTxs = filteredTxs
+              .where((tx) => _selectedPropertyIds.contains(tx.propertyId));
         }
 
         // Filter by unit
         if (_selectedUnitIds.isNotEmpty) {
-          filteredTxs = filteredTxs.where((tx) => _selectedUnitIds.contains(tx.unitId));
+          filteredTxs =
+              filteredTxs.where((tx) => _selectedUnitIds.contains(tx.unitId));
         }
 
         // Filter by type
         if (_selectedTypes.isNotEmpty) {
-          filteredTxs = filteredTxs.where((tx) => _selectedTypes.contains(tx.type));
+          filteredTxs =
+              filteredTxs.where((tx) => _selectedTypes.contains(tx.type));
         }
 
-        return filteredTxs.map((tx) => _TransactionDetail(tx, propMap[tx.propertyId], unitMap[tx.unitId], tenantMap[tx.tenantId])).toList();
+        return filteredTxs
+            .map((tx) => _TransactionDetail(tx, propMap[tx.propertyId],
+                unitMap[tx.unitId], tenantMap[tx.tenantId]))
+            .toList();
       },
     );
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           _buildMonthPagination(),
@@ -93,14 +104,17 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
             child: StreamBuilder<List<_TransactionDetail>>(
               stream: stream,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                if (!snapshot.hasData || snapshot.data!.isEmpty) return _buildEmptyState();
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  return const Center(child: CircularProgressIndicator());
+                if (!snapshot.hasData || snapshot.data!.isEmpty)
+                  return _buildEmptyState();
 
                 final details = snapshot.data!;
                 return ListView.builder(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 120),
                   itemCount: details.length,
-                  itemBuilder: (context, index) => _buildTransactionCard(details[index], user.currency),
+                  itemBuilder: (context, index) =>
+                      _buildTransactionCard(details[index], user.currency),
                 );
               },
             ),
@@ -118,31 +132,36 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
 
     return Container(
       height: 80,
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       child: ListView.builder(
         controller: _monthScrollController,
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         itemCount: months.length,
-
         itemBuilder: (context, index) {
           final month = months[index];
-          final isSelected = month.year == _selectedMonth.year && month.month == _selectedMonth.month;
+          final isSelected = month.year == _selectedMonth.year &&
+              month.month == _selectedMonth.month;
           return GestureDetector(
             onTap: () => setState(() => _selectedMonth = month),
             child: Container(
               margin: const EdgeInsets.only(right: 12),
               padding: const EdgeInsets.symmetric(horizontal: 20),
               decoration: BoxDecoration(
-                color: isSelected ? ThemeProvider.accentBlue : Colors.grey.shade50,
+                color: isSelected
+                    ? ThemeProvider.accentBlue
+                    : Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: isSelected ? ThemeProvider.accentBlue : Colors.grey.shade200),
+                border: Border.all(
+                    color: isSelected
+                        ? ThemeProvider.accentBlue
+                        : Colors.grey.shade200),
               ),
               alignment: Alignment.center,
               child: Text(
                 DateFormat('MMM yy').format(month),
                 style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.grey.shade700,
+                  color: isSelected ? Colors.white : Theme.of(context).textTheme.bodyMedium?.color,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
@@ -155,7 +174,7 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
 
   Widget _buildFilters(DatabaseService db, String ownerId) {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Column(
         children: [
@@ -173,7 +192,8 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
                   onChanged: (ids) => setState(() {
                     _selectedPropertyIds.clear();
                     _selectedPropertyIds.addAll(ids);
-                    _selectedUnitIds.clear(); // Reset units when properties change
+                    _selectedUnitIds
+                        .clear(); // Reset units when properties change
                   }),
                 ),
               ),
@@ -183,11 +203,15 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
                 selectedCount: _selectedUnitIds.length,
                 onTap: () => _showMultiSelectDialog(
                   title: 'Select Units',
-                  stream: _selectedPropertyIds.length == 1 
+                  stream: _selectedPropertyIds.length == 1
                       ? db.getUnits(_selectedPropertyIds.first)
-                      : db.allUnits(ownerId).map((units) => _selectedPropertyIds.isEmpty 
-                          ? units 
-                          : units.where((u) => _selectedPropertyIds.contains(u.propertyId)).toList()),
+                      : db.allUnits(ownerId).map((units) => _selectedPropertyIds
+                              .isEmpty
+                          ? units
+                          : units
+                              .where((u) =>
+                                  _selectedPropertyIds.contains(u.propertyId))
+                              .toList()),
                   selectedIds: _selectedUnitIds,
                   idMapper: (UnitModel u) => u.id,
                   labelMapper: (UnitModel u) => 'Unit ${u.unitNumber}',
@@ -210,16 +234,24 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
     );
   }
 
-  Widget _buildMultiSelectFilter({required String label, required int selectedCount, required VoidCallback onTap}) {
+  Widget _buildMultiSelectFilter(
+      {required String label,
+      required int selectedCount,
+      required VoidCallback onTap}) {
     return Expanded(
       child: InkWell(
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
-            color: selectedCount > 0 ? ThemeProvider.accentBlue.withOpacity(0.05) : Colors.grey.shade50,
+            color: selectedCount > 0
+                ? ThemeProvider.accentBlue.withOpacity(0.05)
+                : Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: selectedCount > 0 ? ThemeProvider.accentBlue : Colors.grey.shade200),
+            border: Border.all(
+                color: selectedCount > 0
+                    ? ThemeProvider.accentBlue
+                    : Colors.grey.shade200),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -229,13 +261,20 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
                   selectedCount > 0 ? '$label ($selectedCount)' : label,
                   style: TextStyle(
                     fontSize: 12,
-                    fontWeight: selectedCount > 0 ? FontWeight.bold : FontWeight.normal,
-                    color: selectedCount > 0 ? ThemeProvider.accentBlue : Colors.grey.shade600,
+                    fontWeight:
+                        selectedCount > 0 ? FontWeight.bold : FontWeight.normal,
+                    color: selectedCount > 0
+                        ? ThemeProvider.accentBlue
+                        : Colors.grey.shade600,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: selectedCount > 0 ? ThemeProvider.accentBlue : Colors.grey),
+              Icon(Icons.keyboard_arrow_down_rounded,
+                  size: 16,
+                  color: selectedCount > 0
+                      ? ThemeProvider.accentBlue
+                      : Colors.grey),
             ],
           ),
         ),
@@ -258,13 +297,16 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              title: Text(title,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold)),
               content: SizedBox(
                 width: double.maxFinite,
                 child: StreamBuilder<List<T>>(
                   stream: stream,
                   builder: (context, snapshot) {
-                    if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                    if (!snapshot.hasData)
+                      return const Center(child: CircularProgressIndicator());
                     final items = snapshot.data!;
                     return ListView.builder(
                       shrinkWrap: true,
@@ -278,8 +320,10 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
                           title: Text(label),
                           onChanged: (val) {
                             setDialogState(() {
-                              if (val == true) tempSelected.add(id);
-                              else tempSelected.remove(id);
+                              if (val == true)
+                                tempSelected.add(id);
+                              else
+                                tempSelected.remove(id);
                             });
                           },
                         );
@@ -289,7 +333,9 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel')),
                 ElevatedButton(
                   onPressed: () {
                     onChanged(tempSelected);
@@ -319,18 +365,23 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
                 children: TransactionType.values.map((type) {
                   return CheckboxListTile(
                     value: tempSelected.contains(type),
-                    title: Text(type == TransactionType.income ? 'Income' : 'Expense'),
+                    title: Text(
+                        type == TransactionType.income ? 'Income' : 'Expense'),
                     onChanged: (val) {
                       setDialogState(() {
-                        if (val == true) tempSelected.add(type);
-                        else tempSelected.remove(type);
+                        if (val == true)
+                          tempSelected.add(type);
+                        else
+                          tempSelected.remove(type);
                       });
                     },
                   );
                 }).toList(),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel')),
                 ElevatedButton(
                   onPressed: () {
                     setState(() {
@@ -354,29 +405,53 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]),
+      decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)
+          ]),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: (isIncome ? Colors.green : Colors.red).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-            child: Icon(isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, color: isIncome ? Colors.green : Colors.red, size: 20),
+            decoration: BoxDecoration(
+                color: (isIncome ? Colors.green : Colors.red).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12)),
+            child: Icon(
+                isIncome
+                    ? Icons.arrow_downward_rounded
+                    : Icons.arrow_upward_rounded,
+                color: isIncome ? Colors.green : Colors.red,
+                size: 20),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(detail.tx.description, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                Text('${detail.property?.name ?? ''} • Unit ${detail.unit?.unitNumber ?? ''}', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                Text(detail.tx.description,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(
+                    '${detail.property?.name ?? ''} • Unit ${detail.unit?.unitNumber ?? ''}',
+                    style: TextStyle(
+                        color: Theme.of(context).textTheme.bodyMedium?.color,
+                        fontSize: 12)),
               ],
             ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('${isIncome ? '+' : '-'}${CurrencyHelper.format(detail.tx.amount, currency)}', style: TextStyle(fontWeight: FontWeight.bold, color: isIncome ? Colors.green : Colors.red, fontSize: 16)),
-              Text(DateFormat('MMM dd').format(detail.tx.date), style: TextStyle(color: Colors.grey.shade400, fontSize: 11)),
+              Text(
+                  '${isIncome ? '+' : '-'}${CurrencyHelper.format(detail.tx.amount, currency)}',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isIncome ? Colors.green : Colors.red,
+                      fontSize: 16)),
+              Text(DateFormat('MMM dd').format(detail.tx.date),
+                  style: TextStyle(color: Colors.grey.shade400, fontSize: 11)),
             ],
           ),
         ],
@@ -385,7 +460,12 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.receipt_long_rounded, size: 64, color: Colors.grey.shade200), const SizedBox(height: 16), const Text('No records for this selection')]));
+    return Center(
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(Icons.receipt_long_rounded, size: 64, color: Colors.grey.shade200),
+      const SizedBox(height: 16),
+      const Text('No records for this selection')
+    ]));
   }
 }
 

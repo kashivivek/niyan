@@ -32,7 +32,7 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
     if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Post Discussion', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: Colors.white,
@@ -108,7 +108,7 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
 
   Widget _buildPostContent(CommunityPost post, UserModel user, CommunityService service) {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -118,14 +118,14 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
               CircleAvatar(
                 radius: 20,
                 backgroundColor: ThemeProvider.primaryNavy.withOpacity(0.05),
-                child: Text(post.authorName[0], style: const TextStyle(color: ThemeProvider.primaryNavy, fontWeight: FontWeight.bold)),
+                child: Text(post.authorName[0], style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(post.authorName, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                    Text(post.authorName, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                     Text(DateFormat('MMM d • HH:mm').format(post.createdAt), style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
                   ],
                 ),
@@ -133,7 +133,7 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Text(post.caption, style: GoogleFonts.inter(fontSize: 15, color: ThemeProvider.primaryNavy, height: 1.5)),
+          Text(post.caption, style: GoogleFonts.inter(fontSize: 15, color: Theme.of(context).colorScheme.primary, height: 1.5)),
           if (post.imageUrl != null) ...[
             const SizedBox(height: 16),
             ClipRRect(
@@ -155,7 +155,7 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
               _DetailActionButton(
                 icon: Icons.share_outlined,
                 label: 'Share',
-                color: Colors.grey.shade600,
+                color: Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white,
                 onTap: () {},
               ),
             ],
@@ -169,7 +169,7 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
     return Container(
       padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         border: Border(top: BorderSide(color: Colors.grey.shade200)),
       ),
       child: Row(
@@ -204,7 +204,7 @@ class _CommunityPostDetailScreenState extends State<CommunityPostDetailScreen> {
                 _commentController.clear();
                 FocusScope.of(context).unfocus();
               },
-              icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+              icon: Icon(Icons.send_rounded, color: Theme.of(context).cardColor, size: 20),
             ),
           ),
         ],
@@ -227,14 +227,14 @@ class _CommentItem extends StatelessWidget {
           CircleAvatar(
             radius: 14,
             backgroundColor: ThemeProvider.primaryNavy.withOpacity(0.05),
-            child: Text(comment.authorName[0], style: const TextStyle(fontSize: 10, color: ThemeProvider.primaryNavy, fontWeight: FontWeight.bold)),
+            child: Text(comment.authorName[0], style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.grey.shade100),
               ),
@@ -244,12 +244,12 @@ class _CommentItem extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(comment.authorName, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: ThemeProvider.primaryNavy)),
+                      Text(comment.authorName, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: Theme.of(context).colorScheme.primary)),
                       Text(DateFormat('MMM d').format(comment.createdAt), style: GoogleFonts.inter(fontSize: 10, color: Colors.grey.shade400)),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(comment.text, style: GoogleFonts.inter(fontSize: 14, color: ThemeProvider.primaryNavy, height: 1.4)),
+                  Text(comment.text, style: GoogleFonts.inter(fontSize: 14, color: Theme.of(context).colorScheme.primary, height: 1.4)),
                 ],
               ),
             ),

@@ -23,7 +23,7 @@ class ResidentLedgerScreen extends StatelessWidget {
     if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator(color: ThemeProvider.accentTeal)));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Financial Ledger', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
       ),
@@ -61,8 +61,8 @@ class ResidentLedgerScreen extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Transaction History', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
-                      const Icon(Icons.filter_list_rounded, color: ThemeProvider.primaryNavy),
+                      Text('Transaction History', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+                      Icon(Icons.filter_list_rounded, color: Theme.of(context).colorScheme.primary),
                     ],
                   ),
                 ),
@@ -88,7 +88,7 @@ class ResidentLedgerScreen extends StatelessWidget {
       margin: const EdgeInsets.all(20),
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: ThemeProvider.primaryNavy,
+        color: Theme.of(context).colorScheme.primary,
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(color: ThemeProvider.primaryNavy.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, 10)),
@@ -101,7 +101,7 @@ class ResidentLedgerScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             CurrencyHelper.format(totalDue, currency),
-            style: GoogleFonts.outfit(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
+            style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontSize: 36, fontWeight: FontWeight.bold),
           ),
           if (totalDue > 0) ...[
             const SizedBox(height: 24),
@@ -146,7 +146,7 @@ class _LedgerItem extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.grey.shade100),
       ),
@@ -166,7 +166,7 @@ class _LedgerItem extends StatelessWidget {
         ),
         title: Text(
           DateFormat('MMMM yyyy').format(DateFormat('yyyy-MM').parse(invoice.billingMonth)),
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy),
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
         ),
         subtitle: Text(isPaid ? 'Payment Successful' : 'Due ${DateFormat('MMM dd').format(invoice.dueDate)}', style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
         trailing: Column(
@@ -175,7 +175,7 @@ class _LedgerItem extends StatelessWidget {
           children: [
             Text(
               CurrencyHelper.format(invoice.grandTotal, currency),
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: ThemeProvider.primaryNavy),
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: Theme.of(context).colorScheme.primary),
             ),
             if (!isPaid) const Text('PENDING', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
           ],
@@ -192,7 +192,7 @@ class GatePassScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = Provider.of<UserModel?>(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(title: const Text('My Gate Pass')),
       body: ResponsiveCentered(
         child: SingleChildScrollView(
@@ -200,14 +200,14 @@ class GatePassScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('Universal Resident Access', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+              Text('Universal Resident Access', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
               const SizedBox(height: 8),
               Text('Present this code at any society entry point.', style: GoogleFonts.inter(color: Colors.grey.shade500)),
               const SizedBox(height: 48),
               Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(32),
                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 30, offset: const Offset(0, 15))],
                 ),
@@ -219,7 +219,7 @@ class GatePassScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 48),
-              Text(user?.name?.toUpperCase() ?? 'RESIDENT', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy, letterSpacing: 1.5)),
+              Text(user?.name?.toUpperCase() ?? 'RESIDENT', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary, letterSpacing: 1.5)),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),

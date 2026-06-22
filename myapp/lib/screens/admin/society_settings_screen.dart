@@ -68,7 +68,7 @@ class _SocietySettingsScreenState extends State<SocietySettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Society Settings', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
       ),
@@ -87,7 +87,7 @@ class _SocietySettingsScreenState extends State<SocietySettingsScreen> {
                 child: TextField(
                   controller: _nameController,
                   decoration: const InputDecoration(isDense: true, border: UnderlineInputBorder()),
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: ThemeProvider.primaryNavy),
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: Theme.of(context).colorScheme.primary),
                 ),
               ),
             ),
@@ -98,7 +98,7 @@ class _SocietySettingsScreenState extends State<SocietySettingsScreen> {
               trailing: DropdownButton<String>(
                 value: _settings.currency,
                 items: ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'AUD', 'CAD']
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c, style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy))))
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c, style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary))))
                     .toList(),
                 onChanged: (v) => setState(() => _settings = _settings.copyWith(currency: v)),
                 underline: const SizedBox(),
@@ -199,7 +199,7 @@ class _SocietySettingsScreenState extends State<SocietySettingsScreen> {
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 16),
-      child: Text(title, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 1.2)),
+      child: Text(title, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Theme.of(context).textTheme.bodyMedium?.color, letterSpacing: 1.2)),
     );
   }
 
@@ -208,7 +208,7 @@ class _SocietySettingsScreenState extends State<SocietySettingsScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.grey.shade100),
       ),
@@ -217,16 +217,16 @@ class _SocietySettingsScreenState extends State<SocietySettingsScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: ThemeProvider.primaryNavy.withOpacity(0.05), borderRadius: BorderRadius.circular(14)),
-            child: Icon(icon, color: ThemeProvider.primaryNavy, size: 24),
+            child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                Text(title, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                 const SizedBox(height: 4),
-                Text(subtitle, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500, height: 1.4)),
+                Text(subtitle, style: GoogleFonts.inter(fontSize: 12, color: Theme.of(context).textTheme.bodyMedium?.color, height: 1.4)),
               ],
             ),
           ),

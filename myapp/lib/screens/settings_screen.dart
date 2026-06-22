@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:developer' as developer;
 import 'package:image_picker/image_picker.dart';
 import 'dart:io' as io;
+import 'package:myapp/l10n/generated/app_localizations.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -28,21 +29,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _selectedCurrency = 'USD'; 
   bool _isLoading = false;
   bool _isInitialized = false;
-  
-  bool _notificationsEnabled = false;
-  TimeOfDay _notificationTime = const TimeOfDay(hour: 9, minute: 0);
-  String _notificationTimezone = 'UTC';
-  String _notificationFrequency = 'Daily';
-
-  static const _commonTimezones = [
-    'Device Local Time', 'UTC', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 
-    'Europe/Berlin', 'Asia/Kolkata', 'Asia/Singapore', 'Australia/Sydney'
-  ];
-
-  static const _validCurrencyCodes = [
-    'USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD',
-    'CHF', 'CNY', 'MXN', 'SGD', 'AED', 'BRL', 'ZAR', 'KES', 'NGN',
-  ];
 
   @override
   void initState() {
@@ -56,18 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final user = Provider.of<UserModel?>(context);
     if (user != null && (!_isInitialized || _currentUserId != user.uid)) {
       _nameController.text = user.name ?? '';
-      _selectedCurrency = _validCurrencyCodes.contains(user.currency) ? user.currency : 'USD';
-      _notificationsEnabled = user.notificationsEnabled;
-      _notificationTimezone = user.notificationTimezone.isNotEmpty ? user.notificationTimezone : 'Device Local Time';
-      _notificationFrequency = user.notificationFrequency;
       _currentUserId = user.uid;
-      
-      if (user.notificationTime.isNotEmpty) {
-        try {
-          final parts = user.notificationTime.split(':');
-          _notificationTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
-        } catch (_) {}
-      }
       _isInitialized = true;
     }
   }
@@ -79,15 +54,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-    
-    if (pickedFile != null) {
-      setState(() => _isLoading = true);
-      final user = Provider.of<UserModel?>(context, listen: false);
-      if (user == null) return;
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      
+      if (pickedFile != null) {
+        setState(() => _isLoading = true);
+        final user = Provider.of<UserModel?>(context, listen: false);
+        if (user == null) return;
 
-      try {
         final imageService = ImageService();
         final url = await imageService.uploadProfilePhoto(user.uid, pickedFile);
         
@@ -96,35 +71,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile photo updated!')));
           }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to upload photo. Storage rules may be denying access.')));
+          }
         }
-      } catch (e) {
-        developer.log('Error uploading photo: $e');
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
       }
+    } catch (e) {
+      developer.log('Error uploading photo: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error uploading photo: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _sendTestNotification() async {
-    final success = await NotificationService().requestPermissions();
-    if (success) {
-      await NotificationService().sendTestNotification();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Test notification sent!')),
-        );
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Notification permission denied. Please enable it in browser/system settings.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    }
-  }
+
 
   Future<void> _saveSettings() async {
     if (_formKey.currentState!.validate()) {
@@ -137,11 +100,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       final updatedUser = user.copyWith(
         name: _nameController.text.trim(),
-        currency: _selectedCurrency,
-        notificationsEnabled: _notificationsEnabled,
-        notificationTime: '${_notificationTime.hour.toString().padLeft(2, '0')}:${_notificationTime.minute.toString().padLeft(2, '0')}',
-        notificationTimezone: _notificationTimezone,
-        notificationFrequency: _notificationFrequency,
       );
 
       try {
@@ -174,19 +132,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('Settings', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
-        backgroundColor: Colors.white,
+        title: Text(AppLocalizations.of(context)?.editProfile ?? 'Edit Profile', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: isDark ? Colors.white : ThemeProvider.primaryNavy)),
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: ThemeProvider.primaryNavy),
+        iconTheme: IconThemeData(color: isDark ? Colors.white : ThemeProvider.primaryNavy),
       ),
-      body: Center(
+      body: SafeArea(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32.0),
+            padding: EdgeInsets.all(32.0),
             child: Form(
               key: _formKey,
               child: Column(
@@ -202,7 +162,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ? NetworkImage(user.photoUrl!) 
                               : null,
                           child: (user.photoUrl == null || user.photoUrl!.isEmpty) 
-                              ? Icon(Icons.person_outline_rounded, size: 60, color: ThemeProvider.primaryNavy.withOpacity(0.5))
+                              ? Icon(Icons.person_outline_rounded, size: 60, color: isDark ? Colors.white54 : ThemeProvider.primaryNavy.withOpacity(0.5))
                               : null,
                         ),
                         Positioned(
@@ -212,7 +172,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             backgroundColor: ThemeProvider.accentBlue,
                             radius: 18,
                             child: IconButton(
-                              icon: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                              icon: Icon(Icons.camera_alt, size: 18, color: Colors.white),
                               onPressed: _pickImage,
                             ),
                           ),
@@ -220,183 +180,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 32),
-                  _buildSectionTitle('Profile Information'),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 32),
+                  _buildSectionTitle(AppLocalizations.of(context)?.profileInformation ?? 'Profile Information'),
+                  SizedBox(height: 16),
                   TextFormField(
                     controller: _nameController,
-                    decoration: _inputDecoration('Full Name', Icons.person_outline),
-                    validator: (v) => v!.isEmpty ? 'Please enter your name' : null,
+                    decoration: _inputDecoration(AppLocalizations.of(context)?.fullName ?? 'Full Name', Icons.person_outline),
+                    validator: (v) => v!.isEmpty ? (AppLocalizations.of(context)?.pleaseEnterName ?? 'Please enter your name') : null,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   TextFormField(
                     initialValue: user.email,
                     enabled: false,
-                    decoration: _inputDecoration('Email Address', Icons.email_outlined),
+                    decoration: _inputDecoration(AppLocalizations.of(context)?.emailAddress ?? 'Email Address', Icons.email_outlined),
                   ),
-                  const SizedBox(height: 32),
-                  _buildSectionTitle('Preferences'),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: _selectedCurrency,
-                    decoration: _inputDecoration('Preferred Currency', Icons.payments_outlined),
-                    items: _validCurrencyCodes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                    onChanged: (v) => setState(() => _selectedCurrency = v!),
-                  ),
-                  const SizedBox(height: 32),
-                  _buildSectionTitle('Notifications'),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    title: const Text('Enable Notifications'),
-                    subtitle: const Text('Receive reminders about upcoming rent'),
-                    value: _notificationsEnabled,
-                    onChanged: (v) => setState(() => _notificationsEnabled = v),
-                    activeColor: ThemeProvider.accentBlue,
-                  ),
-                  if (_notificationsEnabled) ...[
-                    ListTile(
-                      title: const Text('Reminder Time'),
-                      subtitle: Text(_notificationTime.format(context)),
-                      trailing: const Icon(Icons.access_time),
-                      onTap: () async {
-                        final picked = await showTimePicker(context: context, initialTime: _notificationTime);
-                        if (picked != null) setState(() => _notificationTime = picked);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: _commonTimezones.contains(_notificationTimezone) ? _notificationTimezone : 'Device Local Time',
-                      decoration: _inputDecoration('Timezone', Icons.public),
-                      items: _commonTimezones.map((tz) => DropdownMenuItem(value: tz, child: Text(tz))).toList(),
-                      onChanged: (v) => setState(() => _notificationTimezone = v!),
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: _notificationFrequency,
-                      decoration: _inputDecoration('Frequency', Icons.repeat),
-                      items: ['Daily', 'Weekly'].map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
-                      onChanged: (v) => setState(() => _notificationFrequency = v!),
-                    ),
-                    const SizedBox(height: 16),
-                    OutlinedButton.icon(
-                      onPressed: _sendTestNotification,
-                      icon: const Icon(Icons.notification_important_outlined),
-                      label: const Text('Send Test Notification'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 48),
+
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: ThemeProvider.primaryNavy,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      padding: EdgeInsets.symmetric(vertical: 18),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
                     onPressed: _isLoading ? null : _saveSettings,
-                    child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('APP MODE'),
-                  const SizedBox(height: 12),
-                  Consumer<AppModeProvider>(
-                    builder: (context, appMode, _) {
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  appMode.isSocietyMode
-                                      ? Icons.apartment_rounded
-                                      : Icons.person_outline_rounded,
-                                  color: ThemeProvider.accentBlue,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  appMode.isSocietyMode
-                                      ? 'Society ERP Mode'
-                                      : 'Standalone Mode',
-                                  style: GoogleFonts.outfit(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 15,
-                                    color: ThemeProvider.primaryNavy,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: ThemeProvider.accentBlue
-                                        .withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    'Active',
-                                    style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        color: ThemeProvider.accentBlue,
-                                        fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (appMode.activeSociety != null) ...
-                              [
-                                const SizedBox(height: 6),
-                                Text(
-                                  appMode.activeSociety!.name,
-                                  style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      color: Colors.grey.shade500),
-                                ),
-                              ],
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: () =>
-                                    context.push('/select-society'),
-                                icon: const Icon(Icons.swap_horiz_rounded,
-                                    size: 18),
-                                label: const Text('Switch Mode / Society'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: ThemeProvider.accentBlue,
-                                  side: const BorderSide(
-                                      color: ThemeProvider.accentBlue),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(10)),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red),
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    onPressed: () => authService.signOut(),
-                    child: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : Text(AppLocalizations.of(context)?.saveChanges ?? 'Save Changes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
                 ],
               ),
@@ -408,18 +215,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSectionTitle(String title) {
-    return Text(title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy.withOpacity(0.6), letterSpacing: 1.2));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Text(title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white60 : ThemeProvider.primaryNavy.withOpacity(0.6), letterSpacing: 1.2));
   }
 
   InputDecoration _inputDecoration(String label, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: ThemeProvider.primaryNavy.withOpacity(0.5)),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade200)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: ThemeProvider.accentBlue, width: 2)),
+      prefixIcon: Icon(icon, color: isDark ? Colors.white54 : ThemeProvider.primaryNavy.withOpacity(0.5)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: ThemeProvider.accentBlue, width: 2)),
       filled: true,
-      fillColor: Colors.white,
+      fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
     );
   }
 }

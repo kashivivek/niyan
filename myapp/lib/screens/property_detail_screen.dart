@@ -12,11 +12,20 @@ import 'package:myapp/utils/currency_helper.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class PropertyDetailScreen extends StatelessWidget {
+enum UnitSortOption { rent, name }
+
+class PropertyDetailScreen extends StatefulWidget {
   final PropertyModel? property;
   final String propertyId;
 
   const PropertyDetailScreen({super.key, this.property, required this.propertyId});
+
+  @override
+  State<PropertyDetailScreen> createState() => _PropertyDetailScreenState();
+}
+
+class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
+  UnitSortOption _sortOption = UnitSortOption.rent;
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +33,8 @@ class PropertyDetailScreen extends StatelessWidget {
     final user = Provider.of<UserModel?>(context);
 
     return StreamBuilder<PropertyModel>(
-      stream: databaseService.getPropertyStream(propertyId),
-      initialData: property,
+      stream: databaseService.getPropertyStream(widget.propertyId),
+      initialData: widget.property,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -41,7 +50,7 @@ class PropertyDetailScreen extends StatelessWidget {
                 flexibleSpace: FlexibleSpaceBar(
                   title: Text(
                     currentProperty.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                       shadows: [Shadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 2))],
@@ -89,11 +98,15 @@ class PropertyDetailScreen extends StatelessWidget {
                 ),
                 actions: [
                   IconButton(
-                    icon: const Icon(Icons.edit_outlined),
+                    icon: Icon(Icons.person_add_outlined, color: Theme.of(context).colorScheme.primary),
+                    onPressed: () => _showShareDialog(context, databaseService, currentProperty),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary),
                     onPressed: () => context.push('/properties/edit', extra: currentProperty),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.white),
+                    icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.primary),
                     onPressed: () => _confirmDelete(context, databaseService, currentProperty),
                   ),
                 ],
@@ -108,11 +121,6 @@ class PropertyDetailScreen extends StatelessWidget {
               ),
             ],
           ),
-          floatingActionButton: FloatingActionButton(
-            backgroundColor: ThemeProvider.accentBlue,
-            onPressed: () => context.push('/property/${currentProperty.id}/unit/add'),
-            child: const Icon(Icons.add, color: Colors.white),
-          ),
         );
       },
     );
@@ -120,23 +128,23 @@ class PropertyDetailScreen extends StatelessWidget {
 
   Widget _buildInfoSection(PropertyModel property) {
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(color: ThemeProvider.accentBlue.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
                 child: Text(property.type.name.toUpperCase(), style: TextStyle(color: ThemeProvider.accentBlue, fontWeight: FontWeight.bold, fontSize: 12)),
               ),
               const SizedBox(width: 8),
-              Text(property.city, style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+              Text(property.city, style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color, fontWeight: FontWeight.w500)),
             ],
           ),
           const SizedBox(height: 16),
-          Text(property.address, style: GoogleFonts.inter(fontSize: 16, color: Colors.grey.shade800)),
+          Text(property.address, style: GoogleFonts.inter(fontSize: 16, color: Theme.of(context).textTheme.bodyLarge?.color)),
         ],
       ),
     );
@@ -144,16 +152,16 @@ class PropertyDetailScreen extends StatelessWidget {
 
   Widget _buildMaintenanceSection(BuildContext context, DatabaseService databaseService, PropertyModel property) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Maintenance Directory', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+              Text('Maintenance Directory', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
               IconButton(
-                icon: const Icon(Icons.add_circle_outline, color: ThemeProvider.accentBlue),
+                icon: Icon(Icons.add_circle_outline, color: ThemeProvider.accentBlue),
                 onPressed: () => _showAddMaintenanceDialog(context, databaseService, property),
               ),
             ],
@@ -175,8 +183,8 @@ class PropertyDetailScreen extends StatelessWidget {
         final nearby = snapshot.data ?? [];
         if (nearby.isEmpty) {
           return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12)),
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(color: Theme.of(context).scaffoldBackgroundColor, borderRadius: BorderRadius.circular(12)),
             child: const Center(child: Text('No maintenance contacts stored for this property.')),
           );
         }
@@ -196,25 +204,25 @@ class PropertyDetailScreen extends StatelessWidget {
 
   Widget _buildContactTile(MaintenanceContact contact, PropertyModel property, DatabaseService databaseService, {bool isFallback = false}) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade100)),
+      margin: EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade100)),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: ThemeProvider.accentBlue.withOpacity(0.1),
           child: Icon(_getCategoryIcon(contact.category), color: ThemeProvider.accentBlue, size: 20),
         ),
-        title: Text(contact.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(contact.name, style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(contact.category),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(Icons.call_rounded, color: Colors.green),
+              icon: Icon(Icons.call_rounded, color: Colors.green),
               onPressed: () => launchUrl(Uri.parse('tel:${contact.phone}')),
             ),
             if (!isFallback)
               IconButton(
-                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                icon: Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
                 onPressed: () => _removeContact(databaseService, property, contact),
               ),
           ],
@@ -240,7 +248,7 @@ class PropertyDetailScreen extends StatelessWidget {
 
   Widget _buildActionsSection(BuildContext context, DatabaseService databaseService, PropertyModel property) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Row(
         children: [
           Expanded(
@@ -248,12 +256,26 @@ class PropertyDetailScreen extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: ThemeProvider.primaryNavy,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: () => _showExpenseModal(context, databaseService, property),
-              icon: const Icon(Icons.add_card_rounded),
+              icon: Icon(Icons.add_card_rounded),
               label: const Text('Add Expense'),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ThemeProvider.accentBlue,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => context.push('/property/${property.id}/unit/add'),
+              icon: Icon(Icons.add_rounded),
+              label: const Text('Add Unit'),
             ),
           ),
         ],
@@ -263,18 +285,39 @@ class PropertyDetailScreen extends StatelessWidget {
 
   Widget _buildUnitsSection(BuildContext context, DatabaseService databaseService, PropertyModel property, UserModel? user) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Units', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
-              TextButton.icon(
-                onPressed: () => context.push('/property/${property.id}/unit/add'),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Unit'),
+              Text('Units', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+              Row(
+                children: [
+                  DropdownButton<UnitSortOption>(
+                    value: _sortOption,
+                    underline: const SizedBox.shrink(),
+                    icon: Icon(Icons.sort_rounded, color: ThemeProvider.accentBlue, size: 20),
+                    items: [
+                      DropdownMenuItem(
+                        value: UnitSortOption.rent,
+                        child: Text('Sort by Rent', style: GoogleFonts.inter(fontSize: 12)),
+                      ),
+                      DropdownMenuItem(
+                        value: UnitSortOption.name,
+                        child: Text('Sort by Name', style: GoogleFonts.inter(fontSize: 12)),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _sortOption = val;
+                        });
+                      }
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -283,8 +326,15 @@ class PropertyDetailScreen extends StatelessWidget {
             stream: databaseService.getUnits(property.id),
             builder: (context, snapshot) {
               if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-              final units = snapshot.data!;
+              final units = List<UnitModel>.from(snapshot.data!);
               if (units.isEmpty) return const Center(child: Text('No units added yet.'));
+
+              // Sort the list of units based on the selected option
+              if (_sortOption == UnitSortOption.rent) {
+                units.sort((a, b) => a.monthlyRent.compareTo(b.monthlyRent));
+              } else {
+                units.sort((a, b) => a.unitNumber.compareTo(b.unitNumber));
+              }
 
               return ListView.builder(
                 shrinkWrap: true,
@@ -293,18 +343,18 @@ class PropertyDetailScreen extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final unit = units[index];
                   return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)),
+                    margin: EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)),
                     child: ListTile(
                       onTap: () => context.push('/property/${property.id}/unit/${unit.id}', extra: unit),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                      title: Text('Unit ${unit.unitNumber}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      title: Text('Unit ${unit.unitNumber}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       subtitle: Text(unit.isOccupied ? 'Occupied' : 'Vacant', style: TextStyle(color: unit.isOccupied ? ThemeProvider.accentBlue : Colors.teal, fontWeight: FontWeight.w600)),
                       trailing: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(CurrencyHelper.format(unit.monthlyRent, user?.currency ?? 'USD'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                          Text(CurrencyHelper.format(unit.monthlyRent, user?.currency ?? 'USD'), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                           const Text('per month', style: TextStyle(fontSize: 12, color: Colors.grey)),
                         ],
                       ),
@@ -441,7 +491,7 @@ class PropertyDetailScreen extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: ThemeProvider.accentBlue, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16)),
+                          style: ElevatedButton.styleFrom(backgroundColor: ThemeProvider.accentBlue, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(vertical: 16)),
                           onPressed: () async {
                             if (!formKey.currentState!.validate() || selectedUnitIds.isEmpty) return;
                             final monthStr = '$selectedYear-${selectedMonth.toString().padLeft(2, '0')}';
@@ -490,6 +540,56 @@ class PropertyDetailScreen extends StatelessWidget {
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showShareDialog(BuildContext context, DatabaseService databaseService, PropertyModel property) {
+    final emailController = TextEditingController();
+    bool isLoading = false;
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Share Property'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Invite a co-owner by email. They must have an account on this app.'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder()),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              if (isLoading) const Padding(padding: EdgeInsets.only(top: 16), child: CircularProgressIndicator()),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: isLoading ? null : () async {
+                if (emailController.text.trim().isEmpty) return;
+                setDialogState(() => isLoading = true);
+                try {
+                  await databaseService.inviteCoOwner(property.id, emailController.text.trim());
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invitation sent successfully.')));
+                  }
+                } catch (e) {
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))));
+                  }
+                } finally {
+                  if (ctx.mounted) setDialogState(() => isLoading = false);
+                }
+              },
+              child: const Text('Invite'),
+            ),
+          ],
+        ),
       ),
     );
   }

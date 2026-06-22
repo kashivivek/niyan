@@ -32,7 +32,7 @@ class _InviteMemberScreenState extends State<InviteMemberScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Grant Access', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+            Text('Grant Access', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
             const SizedBox(height: 8),
             Text('Invite users to join ${appMode.activeSociety?.name} and assign their roles.', style: GoogleFonts.inter(color: Colors.grey.shade600)),
             const SizedBox(height: 32),

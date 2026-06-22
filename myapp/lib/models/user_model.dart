@@ -19,6 +19,8 @@ class UserModel {
   final String? activeSocietyId;
   final AppRole currentRole;
   final String? activeMode; // 'standalone' | 'society' — stored in Firestore for cross-device persistence
+  final bool isDarkMode;
+  final String language;
 
   UserModel({
     required this.uid,
@@ -36,6 +38,8 @@ class UserModel {
     this.activeSocietyId,
     this.currentRole = AppRole.resident,
     this.activeMode,
+    this.isDarkMode = false,
+    this.language = 'en',
   });
 
   factory UserModel.fromFirebaseAuthUser(User user) {
@@ -69,6 +73,8 @@ class UserModel {
         orElse: () => AppRole.resident,
       ),
       activeMode: data['activeMode'],
+      isDarkMode: data['isDarkMode'] ?? false,
+      language: data['language'] ?? 'en',
     );
   }
 
@@ -88,6 +94,8 @@ class UserModel {
       'activeSocietyId': activeSocietyId,
       'currentRole': currentRole.toString(),
       'activeMode': activeMode,
+      'isDarkMode': isDarkMode,
+      'language': language,
     };
   }
 
@@ -106,6 +114,8 @@ class UserModel {
     String? activeSocietyId,
     AppRole? currentRole,
     String? activeMode,
+    bool? isDarkMode,
+    String? language,
   }) {
     return UserModel(
       uid: uid,
@@ -123,6 +133,8 @@ class UserModel {
       activeSocietyId: activeSocietyId ?? this.activeSocietyId,
       currentRole: currentRole ?? this.currentRole,
       activeMode: activeMode ?? this.activeMode,
+      isDarkMode: isDarkMode ?? this.isDarkMode,
+      language: language ?? this.language,
     );
   }
 }

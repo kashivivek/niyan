@@ -56,7 +56,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 960),
@@ -74,7 +74,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     style: GoogleFonts.outfit(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: ThemeProvider.primaryNavy,
+                      color: Theme.of(context).colorScheme.primary,
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -89,7 +89,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     style: GoogleFonts.outfit(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: ThemeProvider.primaryNavy,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -127,7 +127,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     style: GoogleFonts.outfit(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: ThemeProvider.primaryNavy,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -148,7 +148,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             title: 'Gate Control',
                             subtitle: 'Live entry logs',
                             icon: Icons.shield_rounded,
-                            color: ThemeProvider.primaryNavy,
+                            color: Theme.of(context).colorScheme.primary,
                             onTap: () => context.push('/gate'),
                             badgeText: 'Live',
                           ),
@@ -163,7 +163,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             title: 'Assets',
                             subtitle: 'Equipment & Maint.',
                             icon: Icons.precision_manufacturing_rounded,
-                            color: ThemeProvider.primaryNavy,
+                            color: Theme.of(context).colorScheme.primary,
                             onTap: () => context.push('/assets'),
                           ),
                           VibrantDashboardTile(
@@ -177,7 +177,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             title: 'Settings',
                             subtitle: 'Rules & Automation',
                             icon: Icons.settings_suggest_rounded,
-                            color: ThemeProvider.primaryNavy,
+                            color: Theme.of(context).colorScheme.primary,
                             onTap: () => context.push('/society/settings'),
                           ),
                         ],
@@ -226,7 +226,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: Colors.white, size: 24),
+              child: Icon(icon, color: Theme.of(context).cardColor, size: 24),
             ),
             const SizedBox(height: 20),
             Text(
@@ -234,7 +234,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               style: GoogleFonts.outfit(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
               ),
             ),
             Text(
@@ -256,7 +256,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.grey.shade100),
       ),
@@ -271,7 +271,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 style: GoogleFonts.outfit(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: ThemeProvider.primaryNavy,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
               TextButton(
@@ -309,7 +309,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             children: [
               Text(
                 title,
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: ThemeProvider.primaryNavy),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary),
               ),
               Text(
                 time,

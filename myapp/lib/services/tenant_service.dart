@@ -101,6 +101,8 @@ class TenantService {
     required String tenantId,
     required String propertyId,
     required String ownerId,
+    double? proratedAmount,
+    DateTime? proratedDueDate,
     Future<void> Function(String)? onAssigned,
   }) async {
     final batch = _db.batch();
@@ -133,7 +135,30 @@ class TenantService {
     });
 
     final tenantRef = _db.collection('tenants').doc(tenantId);
-    batch.update(tenantRef, {'isAssignedToUnit': true});
+    batch.update(tenantRef, {
+      'isAssignedToUnit': true,
+      'propertyId': propertyId,
+      'assignedUnitId': unitId,
+    });
+
+    // Create Prorated Rent record if provided
+    if (proratedAmount != null && proratedAmount > 0) {
+      final rentRecordRef = _db.collection('rentRecords').doc();
+      final proratedRecord = RentRecordModel(
+        id: rentRecordRef.id,
+        tenantId: tenantId,
+        propertyId: propertyId,
+        unitId: unitId,
+        ownerId: ownerId,
+        amount: proratedAmount,
+        month: DateFormat('yyyy-MM').format(DateTime.now()),
+        status: RentStatus.pending,
+        dueDate: proratedDueDate ?? DateTime.now(),
+        title: 'Prorated Rent',
+        notes: 'Prorated rent for partial month',
+      );
+      batch.set(rentRecordRef, proratedRecord.toFirestore());
+    }
 
     await batch.commit();
 
@@ -193,12 +218,28 @@ class TenantService {
         'lastVacatedDate': Timestamp.now(),
       });
 
-      batch.update(tenantRef, {
-        'isAssignedToUnit': false,
-        'assignedUnitId': '',
-        'propertyId': '',
-        'status': TenantStatus.past.toString(),
-      });
+      // Find if tenant is assigned to other units
+      final propertiesSnap = await _db.collection('properties').where('ownerId', isEqualTo: tenant.ownerId).get();
+      bool assignedElsewhere = false;
+      for (var propDoc in propertiesSnap.docs) {
+        final unitsSnap = await propDoc.reference.collection('units').get();
+        for (var uDoc in unitsSnap.docs) {
+          if (uDoc.id != unitId && uDoc.data()['currentTenantId'] == tenantId) {
+            assignedElsewhere = true;
+            break;
+          }
+        }
+        if (assignedElsewhere) break;
+      }
+
+      if (!assignedElsewhere) {
+        batch.update(tenantRef, {
+          'isAssignedToUnit': false,
+          'assignedUnitId': '',
+          'propertyId': '',
+          'status': TenantStatus.past.toString(),
+        });
+      }
 
       // 3. Mark pending as paid via deposit if possible
       for (var doc in pendingRecordsSnap.docs) {

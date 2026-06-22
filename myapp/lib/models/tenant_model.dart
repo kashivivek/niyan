@@ -19,6 +19,8 @@ class TenantModel {
   final String? photoUrl;
   final double securityDeposit; // #7: Captured once per tenant
   final String? societyId;
+  final DateTime? rentTrackingStartDate;
+  final DateTime? lastRentIncreaseDate;
 
   TenantModel({
     required this.id,
@@ -37,6 +39,8 @@ class TenantModel {
     this.photoUrl,
     this.securityDeposit = 0.0,
     this.societyId,
+    this.rentTrackingStartDate,
+    this.lastRentIncreaseDate,
   });
 
   factory TenantModel.fromFirestore(DocumentSnapshot doc) {
@@ -61,6 +65,8 @@ class TenantModel {
       photoUrl: data['photoUrl'] as String?,
       securityDeposit: (data['securityDeposit'] ?? 0).toDouble(),
       societyId: data['societyId'] as String?,
+      rentTrackingStartDate: data['rentTrackingStartDate'] != null ? (data['rentTrackingStartDate'] as Timestamp).toDate() : null,
+      lastRentIncreaseDate: data['lastRentIncreaseDate'] != null ? (data['lastRentIncreaseDate'] as Timestamp).toDate() : null,
     );
   }
 
@@ -81,6 +87,8 @@ class TenantModel {
       'photoUrl': photoUrl,
       'securityDeposit': securityDeposit,
       'societyId': societyId,
+      'rentTrackingStartDate': rentTrackingStartDate != null ? Timestamp.fromDate(rentTrackingStartDate!) : null,
+      'lastRentIncreaseDate': lastRentIncreaseDate != null ? Timestamp.fromDate(lastRentIncreaseDate!) : null,
     };
   }
 
@@ -100,6 +108,8 @@ class TenantModel {
     bool? isAssignedToUnit,
     String? photoUrl,
     double? securityDeposit,
+    DateTime? rentTrackingStartDate,
+    DateTime? lastRentIncreaseDate,
   }) {
     return TenantModel(
       id: id ?? this.id,
@@ -117,6 +127,9 @@ class TenantModel {
       isAssignedToUnit: isAssignedToUnit ?? this.isAssignedToUnit,
       photoUrl: photoUrl ?? this.photoUrl,
       securityDeposit: securityDeposit ?? this.securityDeposit,
+      societyId: this.societyId,
+      rentTrackingStartDate: rentTrackingStartDate ?? this.rentTrackingStartDate,
+      lastRentIncreaseDate: lastRentIncreaseDate ?? this.lastRentIncreaseDate,
     );
   }
 }

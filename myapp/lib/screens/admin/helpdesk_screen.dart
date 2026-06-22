@@ -46,7 +46,7 @@ class _HelpdeskScreenState extends State<HelpdeskScreen> with SingleTickerProvid
         : adminService.getTicketsForSociety(appMode.activeSociety!.id);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Helpdesk', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
         bottom: TabBar(
@@ -64,9 +64,9 @@ class _HelpdeskScreenState extends State<HelpdeskScreen> with SingleTickerProvid
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateTicketSheet(context, user, appMode.activeSociety!.id),
-        backgroundColor: ThemeProvider.accentBlue,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark ? ThemeProvider.accentTeal : ThemeProvider.accentBlue,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text('New Ticket', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600)),
+        label: Text('New Ticket', style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontWeight: FontWeight.w600)),
       ),
       body: StreamBuilder<List<TicketModel>>(
         stream: stream,
@@ -135,7 +135,7 @@ class _TicketCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade100),
         boxShadow: [
@@ -184,7 +184,7 @@ class _TicketCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             ticket.title,
-            style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy),
+            style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
           ),
           const SizedBox(height: 4),
           Text(
@@ -293,8 +293,8 @@ class _CreateTicketSheetState extends State<_CreateTicketSheet> {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 100),
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Form(
@@ -305,7 +305,7 @@ class _CreateTicketSheetState extends State<_CreateTicketSheet> {
           children: [
             Row(
               children: [
-                Text('Raise a Ticket', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18, color: ThemeProvider.primaryNavy)),
+                Text('Raise a Ticket', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18, color: Theme.of(context).colorScheme.primary)),
                 const Spacer(),
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
               ],
@@ -369,7 +369,7 @@ class _CreateTicketSheetState extends State<_CreateTicketSheet> {
                 ),
                 child: _isSaving
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text('Submit Ticket', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16)),
+                    : Text('Submit Ticket', style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontWeight: FontWeight.w600, fontSize: 16)),
               ),
             ),
           ],

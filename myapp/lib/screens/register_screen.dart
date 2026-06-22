@@ -55,13 +55,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = isDark ? Colors.white : ThemeProvider.primaryNavy;
+    final inputFill = isDark ? const Color(0xFF1E293B) : Colors.grey.shade50;
+    
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent, 
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: ThemeProvider.primaryNavy),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: primaryColor),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
@@ -73,9 +77,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Join Niyan', style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                Text('Join Niyan', style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: primaryColor)),
                 const SizedBox(height: 8),
-                Text('Select how you will use the app', style: GoogleFonts.inter(color: Colors.grey.shade600)),
+                Text('Select how you will use the app', style: GoogleFonts.inter(color: isDark ? Colors.white70 : Colors.grey.shade600)),
                 const SizedBox(height: 32),
                 
                 Row(
@@ -106,22 +110,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
+                    color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
                     children: _selectedRole == AppRole.owner 
                     ? [
-                        _bullet('Direct Landlord-Tenant management'),
-                        _bullet('Rent collection & automated receipts'),
-                        _bullet('Ledger tracking for individual units'),
-                        _bullet('Perfect for individual property owners'),
+                        _bullet('Direct Landlord-Tenant management', isDark),
+                        _bullet('Rent collection & automated receipts', isDark),
+                        _bullet('Co-Owner property sharing & sync', isDark),
+                        _bullet('Annual 5% rent increase reminders', isDark),
                       ]
                     : [
-                        _bullet('Full Society Management (ERP)'),
-                        _bullet('Security & Visitor Management (Gate)'),
-                        _bullet('Society Notices & Community Board'),
-                        _bullet('Helpdesk, Amenities & Billing'),
+                        _bullet('Full Society Management (ERP)', isDark),
+                        _bullet('Security & Visitor Management (Gate)', isDark),
+                        _bullet('Society Notices & Community Board', isDark),
+                        _bullet('Helpdesk, Amenities & Billing', isDark),
                       ],
                   ),
                 ),
@@ -129,32 +133,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 32),
                 TextField(
                   controller: _nameController,
+                  style: TextStyle(color: primaryColor),
                   decoration: InputDecoration(
                     labelText: 'Full Name',
-                    prefixIcon: const Icon(Icons.person_outline_rounded, color: ThemeProvider.primaryNavy),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: ThemeProvider.primaryNavy, width: 2)),
+                    labelStyle: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade600),
+                    prefixIcon: Icon(Icons.person_outline_rounded, color: primaryColor),
+                    filled: true,
+                    fillColor: inputFill,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? ThemeProvider.accentTeal : ThemeProvider.primaryNavy, width: 2)),
                   ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _emailController,
+                  style: TextStyle(color: primaryColor),
                   decoration: InputDecoration(
                     labelText: 'Email',
-                    prefixIcon: const Icon(Icons.email_outlined, color: ThemeProvider.primaryNavy),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: ThemeProvider.primaryNavy, width: 2)),
+                    labelStyle: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade600),
+                    prefixIcon: Icon(Icons.email_outlined, color: primaryColor),
+                    filled: true,
+                    fillColor: inputFill,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? ThemeProvider.accentTeal : ThemeProvider.primaryNavy, width: 2)),
                   ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _passwordController,
                   obscureText: true,
+                  style: TextStyle(color: primaryColor),
                   decoration: InputDecoration(
                     labelText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outline_rounded, color: ThemeProvider.primaryNavy),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: ThemeProvider.primaryNavy, width: 2)),
+                    labelStyle: TextStyle(color: isDark ? Colors.white60 : Colors.grey.shade600),
+                    prefixIcon: Icon(Icons.lock_outline_rounded, color: primaryColor),
+                    filled: true,
+                    fillColor: inputFill,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDark ? ThemeProvider.accentTeal : ThemeProvider.primaryNavy, width: 2)),
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -164,7 +180,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _register,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: ThemeProvider.primaryNavy,
+                      backgroundColor: isDark ? ThemeProvider.accentTeal : ThemeProvider.primaryNavy,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -175,7 +191,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Center(
                   child: TextButton(
                     onPressed: () => context.go('/login'),
-                    child: const Text('Already have an account? Login', style: TextStyle(color: ThemeProvider.primaryNavy, fontWeight: FontWeight.bold)),
+                    child: Text('Already have an account? Login', style: TextStyle(color: isDark ? ThemeProvider.accentTeal : ThemeProvider.primaryNavy, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -185,49 +201,53 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
-
-  Widget _bullet(String text) {
+ 
+  Widget _bullet(String text, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
           const Icon(Icons.check_circle_rounded, size: 16, color: ThemeProvider.accentTeal),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade700))),
+          Expanded(child: Text(text, style: GoogleFonts.inter(fontSize: 12, color: isDark ? Colors.white70 : Colors.grey.shade700))),
         ],
       ),
     );
   }
 }
-
+ 
 class _RoleCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
-
+ 
   const _RoleCard({required this.title, required this.subtitle, required this.icon, required this.selected, required this.onTap});
-
+ 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: selected ? ThemeProvider.accentTeal.withOpacity(0.05) : Colors.white,
+          color: selected 
+              ? ThemeProvider.accentTeal.withOpacity(0.08) 
+              : (isDark ? const Color(0xFF1E293B) : Colors.white),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: selected ? ThemeProvider.accentTeal : Colors.grey.shade200, width: 2),
+          border: Border.all(color: selected ? ThemeProvider.accentTeal : (isDark ? Colors.grey.shade800 : Colors.grey.shade200), width: 2),
         ),
         child: Column(
           children: [
             Icon(icon, color: selected ? ThemeProvider.accentTeal : Colors.grey.shade400, size: 32),
             const SizedBox(height: 12),
-            Text(title, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: selected ? ThemeProvider.accentTeal : ThemeProvider.primaryNavy)),
+            Text(title, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: selected ? ThemeProvider.accentTeal : (isDark ? Colors.white : ThemeProvider.primaryNavy))),
             const SizedBox(height: 4),
-            Text(subtitle, textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 10, color: Colors.grey.shade500)),
+            Text(subtitle, textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 10, color: isDark ? Colors.white54 : Colors.grey.shade500)),
           ],
         ),
       ),

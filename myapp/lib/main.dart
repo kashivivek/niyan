@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:myapp/models/user_model.dart';
 import 'package:myapp/services/auth_service.dart';
@@ -22,6 +23,8 @@ import 'package:myapp/firebase_options.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:myapp/services/notification_service.dart';
 import 'package:myapp/router/app_router.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:myapp/l10n/generated/app_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,6 +40,14 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  // Silent auto-login if session is lost on mobile
+  if (!kIsWeb) {
+    try {
+      await AuthService().attemptAutoLogin();
+    } catch (e) {
+      debugPrint('Error during auto-login on startup: $e');
+    }
+  }
   // Activate App Check for non-web platforms.
   if (!kIsWeb) {
     await FirebaseAppCheck.instance.activate(
@@ -78,6 +89,7 @@ class _MyAppState extends State<MyApp> {
         Provider<AuthService>.value(value: _authService),
         // Legacy monolithic service — kept for backward compatibility
         // Screens are gradually migrating to domain-specific services below
+        Provider<FirebaseFirestore>.value(value: FirebaseFirestore.instance),
         Provider<DatabaseService>(create: (_) => DatabaseService()),
         Provider<ImageService>(create: (_) => ImageService()),
         // New domain-specific services (Phase 0)
@@ -95,13 +107,18 @@ class _MyAppState extends State<MyApp> {
           initialData: null,
         ),
       ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, child) {
+      child: Consumer2<ThemeProvider, UserModel?>(
+        builder: (context, themeProvider, user, child) {
+          final isDark = user?.isDarkMode ?? false;
+          final languageCode = user?.language ?? 'en';
           return MaterialApp.router(
             title: 'Niyan',
             theme: ThemeProvider.lightTheme,
             darkTheme: ThemeProvider.darkTheme,
-            themeMode: themeProvider.themeMode,
+            themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+            locale: Locale(languageCode),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             routerConfig: _appRouter.router,
             debugShowCheckedModeBanner: false,
           );

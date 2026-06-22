@@ -22,7 +22,7 @@ class DocumentLibraryScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Document Library', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
       ),
@@ -72,7 +72,7 @@ class _DocumentCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade100),
         boxShadow: document.isPinned ? [
@@ -110,7 +110,7 @@ class _DocumentCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         document.title,
-                        style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy),
+                        style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
                       ),
                     ),
                   ],
@@ -122,7 +122,7 @@ class _DocumentCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color: Theme.of(context).dividerColor,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(document.fileType.toUpperCase(), style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),

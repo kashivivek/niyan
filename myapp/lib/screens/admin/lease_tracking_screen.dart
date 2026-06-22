@@ -22,7 +22,7 @@ class LeaseTrackingScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Lease Tracking', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
       ),
@@ -73,7 +73,7 @@ class _LeaseCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: isExpiringSoon ? Colors.orange.shade200 : Colors.grey.shade100),
         boxShadow: isExpiringSoon ? [
@@ -117,7 +117,7 @@ class _LeaseCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(lease.tenantName, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+          Text(lease.tenantName, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
           const SizedBox(height: 4),
           Row(
             children: [
@@ -134,7 +134,7 @@ class _LeaseCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Monthly Rent', style: GoogleFonts.inter(fontSize: 11, color: Colors.grey.shade500)),
-                    Text('₹${lease.monthlyRent.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: ThemeProvider.primaryNavy)),
+                    Text('₹${lease.monthlyRent.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
                   ],
                 ),
               ),
@@ -143,7 +143,7 @@ class _LeaseCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Deposit', style: GoogleFonts.inter(fontSize: 11, color: Colors.grey.shade500)),
-                    Text('₹${lease.securityDeposit.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: ThemeProvider.primaryNavy)),
+                    Text('₹${lease.securityDeposit.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
                   ],
                 ),
               ),

@@ -24,7 +24,7 @@ class NoticeBoardScreen extends StatelessWidget {
     final isAdmin = user.currentRole == AppRole.societyAdmin || user.currentRole == AppRole.superAdmin;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('Notice Board', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
       ),
@@ -35,9 +35,9 @@ class NoticeBoardScreen extends StatelessWidget {
                 onPressed: () {
                   _showPostNoticeDialog(context, user, appMode);
                 },
-                backgroundColor: ThemeProvider.accentBlue,
+                backgroundColor: Theme.of(context).brightness == Brightness.dark ? ThemeProvider.accentTeal : ThemeProvider.accentBlue,
                 icon: const Icon(Icons.campaign_rounded, color: Colors.white),
-                label: Text('Post Notice', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600)),
+                label: Text('Post Notice', style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontWeight: FontWeight.w600)),
               ),
             )
           : null,
@@ -99,8 +99,8 @@ class NoticeBoardScreen extends StatelessWidget {
           return Container(
             height: MediaQuery.of(ctx).size.height * 0.85,
             padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
             ),
             child: Padding(
@@ -116,7 +116,7 @@ class NoticeBoardScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                   Text('Post New Notice',
-                      style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                      style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                   const SizedBox(height: 20),
                   TextField(
                     controller: titleController,
@@ -224,7 +224,7 @@ class _AnnouncementCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade100),
         boxShadow: [
@@ -256,7 +256,7 @@ class _AnnouncementCard extends StatelessWidget {
                   children: [
                     Text(
                       announcement.title,
-                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy),
+                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
                     ),
                     Text(
                       'By ${announcement.authorName} • ${DateFormat('MMM d, HH:mm').format(announcement.createdAt)}',

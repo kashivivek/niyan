@@ -11,7 +11,7 @@ class LandingPage extends StatelessWidget {
     final isMobile = MediaQuery.of(context).size.width < 900;
     
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -23,7 +23,7 @@ class LandingPage extends StatelessWidget {
               title: 'For Individual Landlords',
               subtitle: 'Effortless Property Management',
               description: 'Manage your personal portfolio with automated rent collection, digital ledgers, and tenant tracking.',
-              features: ['Automated Rent Invoicing', 'Digital Payment Receipts', 'Tenant KYC & Documents', 'Financial Insights'],
+              features: ['Automated Rent Invoicing & Receipts', 'Annual Rent Increase Reminders (5% Escalation)', 'Property Sharing & Co-Ownership Sync', 'Global Preference Sync (Currency & Dark Mode)', 'Comprehensive Financial Ledgers'],
               image: Icons.home_work_rounded,
               isReversed: false,
             ),
@@ -46,19 +46,22 @@ class LandingPage extends StatelessWidget {
   }
 
   Widget _buildNavbar(BuildContext context, bool isMobile) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = isDark ? Colors.white : ThemeProvider.primaryNavy;
+    
     return Container(
       padding: EdgeInsets.symmetric(horizontal: isMobile ? 20 : 40, vertical: 24),
       child: Row(
         children: [
-          Image.asset('assets/images/logo_full.png', height: isMobile ? 32 : 40, errorBuilder: (c, e, s) => Text('NIYAN', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy))),
+          Image.asset('assets/images/logo_full.png', height: isMobile ? 32 : 40, errorBuilder: (c, e, s) => Text('NIYAN', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: primaryColor))),
           const Spacer(),
           if (!isMobile) ...[
-            TextButton(onPressed: () => context.push('/login'), child: Text('Sign In', style: GoogleFonts.outfit(color: ThemeProvider.primaryNavy, fontWeight: FontWeight.w600))),
+            TextButton(onPressed: () => context.push('/login'), child: Text('Sign In', style: GoogleFonts.outfit(color: primaryColor, fontWeight: FontWeight.w600))),
             const SizedBox(width: 24),
           ],
           ElevatedButton(
             onPressed: () => context.push('/register'),
-            style: ElevatedButton.styleFrom(backgroundColor: ThemeProvider.primaryNavy, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: isMobile ? 20 : 32, vertical: isMobile ? 12 : 16), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+            style: ElevatedButton.styleFrom(backgroundColor: isDark ? ThemeProvider.accentTeal : ThemeProvider.primaryNavy, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: isMobile ? 20 : 32, vertical: isMobile ? 12 : 16), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
             child: Text(isMobile ? 'Get Started' : 'Launch App', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
           ),
         ],
@@ -71,7 +74,7 @@ class LandingPage extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.symmetric(horizontal: isMobile ? 20 : 40, vertical: isMobile ? 80 : 120),
       decoration: BoxDecoration(
-        color: ThemeProvider.primaryNavy,
+        color: Theme.of(context).colorScheme.primary,
         image: DecorationImage(
           image: const AssetImage('assets/images/logo_icon.png'),
           opacity: 0.05,
@@ -90,7 +93,7 @@ class LandingPage extends StatelessWidget {
           Text(
             'Digitize Your Portfolio.\nElevate Your Community.', 
             textAlign: TextAlign.center, 
-            style: GoogleFonts.outfit(fontSize: isMobile ? 36 : 64, fontWeight: FontWeight.bold, color: Colors.white, height: 1.1, letterSpacing: -1)
+            style: GoogleFonts.outfit(fontSize: isMobile ? 36 : 64, fontWeight: FontWeight.bold, color: Theme.of(context).cardColor, height: 1.1, letterSpacing: -1)
           ),
           const SizedBox(height: 32),
           Text(
@@ -105,7 +108,7 @@ class LandingPage extends StatelessWidget {
             alignment: WrapAlignment.center,
             children: [
               _HeroButton(label: 'Society ERP Mode', color: ThemeProvider.accentBlue, onTap: () => context.push('/register'), isMobile: isMobile),
-              _HeroButton(label: 'Individual Landlord', color: Colors.white, isOutlined: true, onTap: () => context.push('/register'), isMobile: isMobile),
+              _HeroButton(label: 'Individual Landlord', color: Theme.of(context).cardColor, isOutlined: true, onTap: () => context.push('/register'), isMobile: isMobile),
             ],
           ),
         ],
@@ -114,6 +117,10 @@ class LandingPage extends StatelessWidget {
   }
 
   Widget _buildCapabilitySection(BuildContext context, bool isMobile, {required String title, required String subtitle, required String description, required List<String> features, required IconData image, bool isReversed = false, Color color = ThemeProvider.primaryNavy}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = isDark ? Colors.white : ThemeProvider.primaryNavy;
+    final bodyColor = isDark ? Colors.white70 : Colors.grey.shade600;
+
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -123,13 +130,13 @@ class LandingPage extends StatelessWidget {
           child: Text(subtitle.toUpperCase(), style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w900, color: color, letterSpacing: 1.5)),
         ),
         const SizedBox(height: 24),
-        Text(title, style: GoogleFonts.outfit(fontSize: isMobile ? 32 : 44, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy, height: 1.1)),
+        Text(title, style: GoogleFonts.outfit(fontSize: isMobile ? 32 : 44, fontWeight: FontWeight.bold, color: primaryColor, height: 1.1)),
         const SizedBox(height: 20),
-        Text(description, style: GoogleFonts.inter(fontSize: isMobile ? 16 : 18, color: Colors.grey.shade600, height: 1.6)),
+        Text(description, style: GoogleFonts.inter(fontSize: isMobile ? 16 : 18, color: bodyColor, height: 1.6)),
         const SizedBox(height: 40),
         ...features.map((f) => Padding(
           padding: const EdgeInsets.only(bottom: 16),
-          child: Row(children: [Icon(Icons.check_circle_rounded, color: color, size: 22), const SizedBox(width: 14), Expanded(child: Text(f, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: ThemeProvider.primaryNavy)))]),
+          child: Row(children: [Icon(Icons.check_circle_rounded, color: color, size: 22), const SizedBox(width: 14), Expanded(child: Text(f, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: primaryColor)))]),
         )),
       ],
     );
@@ -166,7 +173,7 @@ class LandingPage extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(isMobile ? 40 : 60),
       width: double.infinity,
-      color: ThemeProvider.primaryNavy,
+      color: Colors.white,
       child: Column(
         children: [
           Text('Ready to elevate your property management?', textAlign: TextAlign.center, style: GoogleFonts.outfit(fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold, color: Colors.white)),

@@ -35,14 +35,14 @@ class ResidentDashboardScreen extends StatelessWidget {
     final isOwnerOrAdmin = showStats;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 90),
         child: FloatingActionButton.extended(
           onPressed: () => _triggerSos(context, user, appMode),
           backgroundColor: Colors.red.shade600,
           icon: const Icon(Icons.warning_amber_rounded, color: Colors.white),
-          label: Text('SOS', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+          label: Text('SOS', style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold)),
         ),
       ),
       body: Center(
@@ -54,7 +54,7 @@ class ResidentDashboardScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (isOwnerOrAdmin) ...[
-                  Text('Welcome back, ${(user.name?.split(' ') ?? ['Resident']).first}!', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                  Text('Welcome back, ${(user.name?.split(' ') ?? ['Resident']).first}!', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                   const SizedBox(height: 16),
                   if (showStats) _buildOwnerStats(context),
                   const SizedBox(height: 24),
@@ -62,14 +62,14 @@ class ResidentDashboardScreen extends StatelessWidget {
 
                 if (appMode.activeMembership?.role == SocietyRole.owner) ...[
                   const SizedBox(height: 24),
-                  Text('My Properties', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                  Text('My Properties', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                   const SizedBox(height: 16),
                   _buildOwnedUnitsSection(context, user, appMode),
                 ],
 
                 _buildDuesSection(context, user, billingService),
                 const SizedBox(height: 28),
-                Text('Quick Services', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+                Text('Quick Services', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
                 const SizedBox(height: 16),
                 _buildServiceGrid(context, isDesktop),
                 const SizedBox(height: 28),
@@ -95,7 +95,7 @@ class ResidentDashboardScreen extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: ThemeProvider.primaryNavy,
+            color: Theme.of(context).colorScheme.primary,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(color: ThemeProvider.primaryNavy.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 8)),
@@ -121,7 +121,7 @@ class ResidentDashboardScreen extends StatelessWidget {
                 children: [
                   Text(
                     CurrencyHelper.format(totalDue, user.currency),
-                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.outfit(color: Theme.of(context).cardColor, fontSize: 32, fontWeight: FontWeight.bold),
                   ),
                   ElevatedButton(
                     onPressed: () => context.push('/resident-ledger'),
@@ -158,8 +158,7 @@ class ResidentDashboardScreen extends StatelessWidget {
               title: 'Occupancy', 
               value: '94%',
               icon: Icons.house_rounded, 
-              color: ThemeProvider.primaryNavy
-            ),
+              color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 16),
             _OwnerStatCard(
               title: 'Collected', 
@@ -194,7 +193,7 @@ class ResidentDashboardScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.grey.shade100),
         boxShadow: [
@@ -224,14 +223,14 @@ class ResidentDashboardScreen extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.grey.shade100),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Recent Activity', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+          Text('Recent Activity', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
           const SizedBox(height: 16),
           _activityItem('Maintenance Bill Generated', '2 days ago', Icons.receipt_long_rounded, ThemeProvider.accentTeal),
           const Divider(height: 24),
@@ -254,7 +253,7 @@ class ResidentDashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13, color: ThemeProvider.primaryNavy)),
+              Text(title, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.white)),
               Text(time, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
             ],
           ),
@@ -310,7 +309,7 @@ class ResidentDashboardScreen extends StatelessWidget {
                 margin: const EdgeInsets.only(right: 16),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: Colors.grey.shade100),
                 ),
@@ -330,7 +329,7 @@ class ResidentDashboardScreen extends StatelessWidget {
                     ),
                     const Spacer(),
                     Text(u.isOccupied ? 'Occupied' : 'Vacant', style: GoogleFonts.inter(fontSize: 10, color: Colors.grey.shade500)),
-                    Text(CurrencyHelper.format(u.monthlyRent, user.currency), style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy, fontSize: 14)),
+                    Text(CurrencyHelper.format(u.monthlyRent, user.currency), style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary, fontSize: 14)),
                   ],
                 ),
               );
@@ -363,7 +362,7 @@ class _OwnerStatCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.grey.shade100),
         ),
@@ -372,7 +371,7 @@ class _OwnerStatCard extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 24),
             const SizedBox(height: 12),
-            Text(value, style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: ThemeProvider.primaryNavy)),
+            Text(value, style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
             Text(title, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
           ],
         ),
@@ -412,7 +411,7 @@ class _CompactServiceIcon extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 title,
-                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: ThemeProvider.primaryNavy),
+                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary),
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
               ),
