@@ -86,7 +86,7 @@ class _MyAppState extends State<MyApp> {
       providers: [
         ChangeNotifierProvider(create: (context) => ThemeProvider()),
         ChangeNotifierProvider.value(value: _appModeProvider),
-        Provider<AuthService>.value(value: _authService),
+        ChangeNotifierProvider<AuthService>.value(value: _authService),
         // Legacy monolithic service — kept for backward compatibility
         // Screens are gradually migrating to domain-specific services below
         Provider<FirebaseFirestore>.value(value: FirebaseFirestore.instance),

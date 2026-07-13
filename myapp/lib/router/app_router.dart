@@ -67,7 +67,7 @@ class AppRouter {
   late final GoRouter router = GoRouter(
     initialLocation: '/',
     refreshListenable: _CombinedListenable([
-      GoRouterRefreshStream(authService.user),
+      authService,
       appModeProvider,
     ]),
     redirect: (context, state) {
@@ -93,7 +93,7 @@ class AppRouter {
       GoRoute(
         path: '/',
         builder: (context, state) {
-          final auth = context.read<AuthService>();
+          final auth = context.watch<AuthService>();
           if (!auth.initialized) {
             return Scaffold(
               backgroundColor: ThemeProvider.primaryNavy,

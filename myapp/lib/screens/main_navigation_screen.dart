@@ -14,6 +14,7 @@ import 'package:myapp/services/sos_service.dart';
 import 'package:myapp/widgets/responsive_layout.dart';
 import 'package:myapp/l10n/generated/app_localizations.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class MainNavigationScreen extends StatefulWidget {
   final Widget child;
@@ -296,15 +297,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         final unreadCount = (snapshot.data ?? []).where((n) => n.isRead == false).length;
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          FlutterAppBadger.isAppBadgeSupported().then((supported) {
-            if (supported) {
-              if (unreadCount > 0) {
-                FlutterAppBadger.updateBadgeCount(unreadCount);
-              } else {
-                FlutterAppBadger.removeBadge();
+          if (!kIsWeb) {
+            FlutterAppBadger.isAppBadgeSupported().then((supported) {
+              if (supported) {
+                if (unreadCount > 0) {
+                  FlutterAppBadger.updateBadgeCount(unreadCount);
+                } else {
+                  FlutterAppBadger.removeBadge();
+                }
               }
-            }
-          }).catchError((_) {});
+            }).catchError((_) {});
+          }
         });
 
         Widget buildNavIcon(int idx, _NavItem item, bool isSelected, {bool compact = false}) {

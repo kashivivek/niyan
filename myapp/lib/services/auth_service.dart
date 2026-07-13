@@ -7,17 +7,25 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 
-class AuthService {
+class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   bool _initialized = false;
   bool get initialized => _initialized;
 
+  AuthService() {
+    _auth.authStateChanges().listen((_) {
+      if (!_initialized) {
+        _initialized = true;
+      }
+      notifyListeners();
+    });
+  }
+
   User? get currentUser => _auth.currentUser;
 
   Stream<UserModel?> get user {
-    return _auth.authStateChanges().doOnData((_) => _initialized = true).switchMap((User? firebaseUser) {
-
+    return _auth.authStateChanges().switchMap((User? firebaseUser) {
       if (firebaseUser != null) {
         return _db
             .collection('users')
