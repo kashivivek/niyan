@@ -10,6 +10,8 @@ import 'package:myapp/models/user_model.dart';
 import 'package:myapp/providers/app_mode_provider.dart';
 import 'package:mockito/mockito.dart';
 
+import 'package:myapp/models/notification_model.dart';
+
 class MockAuthService extends Mock implements AuthService {
   @override
   Stream<UserModel?> get user => Stream.value(UserModel(
@@ -20,7 +22,10 @@ class MockAuthService extends Mock implements AuthService {
       ));
 }
 
-class MockDatabaseService extends Mock implements DatabaseService {}
+class MockDatabaseService extends Mock implements DatabaseService {
+  @override
+  Stream<List<NotificationModel>> getNotifications(String userId) => Stream.value([]);
+}
 
 class MockAppModeProvider extends AppModeProvider {
   @override
@@ -57,7 +62,7 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          Provider<AuthService>.value(value: mockAuthService),
+          ChangeNotifierProvider<AuthService>.value(value: mockAuthService),
           Provider<DatabaseService>.value(value: mockDatabaseService),
           ChangeNotifierProvider<AppModeProvider>.value(value: mockAppMode),
           StreamProvider<UserModel?>.value(value: mockAuthService.user, initialData: null),

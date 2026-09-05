@@ -87,11 +87,10 @@ class MoreMenuScreen extends StatelessWidget {
 
               const SizedBox(height: 24),
               _buildSectionHeader(AppLocalizations.of(context)?.support ?? 'Support'),
-              _buildMenuTile(context, AppLocalizations.of(context)?.helpCenter ?? 'Help Center', Icons.help_outline_rounded, () => context.push('/help_center')),
               _buildMenuTile(
                 context,
-                AppLocalizations.of(context)?.reportAnIssue ?? 'Report an Issue',
-                Icons.bug_report_outlined,
+                AppLocalizations.of(context)?.reportAnIssue ?? 'Help & Feedback',
+                Icons.support_agent_rounded,
                 () {
                   if (user != null) showFeedbackDialog(context, user);
                 },

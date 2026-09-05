@@ -281,6 +281,107 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
 
+  void _showMoreMenu(BuildContext context, List<_NavItem> overflowItems, int unreadCount, String currentLocation) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 20),
+                height: 4,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 24.0, left: 16, right: 16),
+                child: Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  alignment: WrapAlignment.center,
+                  children: overflowItems.map((item) {
+                    final isSelected = currentLocation.startsWith(item.route);
+                    final isAlerts = item.route == '/notifications';
+                    
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        context.pop(); // close bottom sheet
+                        context.go(item.route);
+                      },
+                      child: Container(
+                        width: 80,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected ? ThemeProvider.accentTeal.withOpacity(0.15) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(
+                                  item.icon,
+                                  color: isSelected ? ThemeProvider.accentTeal : Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                                  size: 24,
+                                ),
+                                if (isAlerts && unreadCount > 0)
+                                  Positioned(
+                                    top: -5,
+                                    right: -6,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(3),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                      child: Text(
+                                        unreadCount > 99 ? '99+' : '$unreadCount',
+                                        style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              item.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.outfit(
+                                color: isSelected ? ThemeProvider.accentTeal : Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                                fontSize: 11,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildGlassmorphicNavBar() {
     final appMode = Provider.of<AppModeProvider>(context);
     final user = Provider.of<UserModel?>(context);
@@ -292,18 +393,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > 900;
-    final needsScroll = !isDesktop && (screenWidth < (items.length * 80));
+    
+    // 4 items visible, rest in overflow
+    const int maxVisible = 4;
+    final visibleItems = items.take(maxVisible).toList();
+    final overflowItems = items.skip(maxVisible).toList();
+    final bool isMoreSelected = selectedIndex >= maxVisible;
 
     return StreamBuilder<List<NotificationModel>>(
       stream: user != null
-          ? Provider.of<DatabaseService>(context, listen: false)
-              .getNotifications(user.uid)
+          ? (Provider.of<DatabaseService>(context, listen: false)
+                  .getNotifications(user.uid) ??
+              const Stream.empty())
           : const Stream.empty(),
       builder: (context, snapshot) {
         final unreadCount = (snapshot.data ?? []).where((n) => n.isRead == false).length;
+        final hasUnreadInMore = overflowItems.any((i) => i.route == '/notifications') && unreadCount > 0;
 
-        Widget buildNavIcon(int idx, _NavItem item, bool isSelected, {bool compact = false}) {
+        Widget buildNavIcon(_NavItem item, bool isSelected, {VoidCallback? onTap}) {
           final isAlerts = item.route == '/notifications';
+          final isMoreBtn = item.route == '';
+          
           final iconWidget = Stack(
             clipBehavior: Clip.none,
             children: [
@@ -329,19 +439,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       textAlign: TextAlign.center,
                     ),
                   ),
+                )
+              else if (isMoreBtn && hasUnreadInMore)
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                 ),
             ],
           );
 
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => context.go(item.route),
+            onTap: onTap ?? () => context.go(item.route),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: compact ? 80 : null,
-              padding: compact
-                  ? const EdgeInsets.symmetric(vertical: 8)
-                  : const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               decoration: BoxDecoration(
                 color: isSelected ? ThemeProvider.accentTeal.withOpacity(0.15) : Colors.transparent,
                 borderRadius: BorderRadius.circular(16),
@@ -367,28 +487,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           );
         }
 
-        Widget navContent;
-        if (needsScroll) {
-          navContent = SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                children: items.asMap().entries.map((entry) {
-                  return buildNavIcon(entry.key, entry.value, entry.key == selectedIndex, compact: true);
-                }).toList(),
+        Widget navContent = Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            ...visibleItems.asMap().entries.map((entry) {
+              return Expanded(
+                child: buildNavIcon(entry.value, entry.key == selectedIndex),
+              );
+            }),
+            if (overflowItems.isNotEmpty)
+              Expanded(
+                child: buildNavIcon(
+                  _NavItem(Icons.more_horiz_rounded, 'More', ''),
+                  isMoreSelected,
+                  onTap: () => _showMoreMenu(context, overflowItems, unreadCount, currentLocation),
+                ),
               ),
-            ),
-          );
-        } else {
-          navContent = Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: items.asMap().entries.map((entry) {
-              return buildNavIcon(entry.key, entry.value, entry.key == selectedIndex);
-            }).toList(),
-          );
-        }
+          ],
+        );
 
         return Center(
           child: Container(

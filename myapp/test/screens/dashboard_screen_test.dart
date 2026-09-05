@@ -11,6 +11,8 @@ import 'package:myapp/providers/app_mode_provider.dart';
 import 'package:myapp/models/property_model.dart';
 import 'package:myapp/models/unit_model.dart';
 import 'package:myapp/models/action_item_model.dart';
+import 'package:myapp/models/notification_model.dart';
+import 'package:myapp/models/rent_record_model.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core_platform_interface/test.dart';
@@ -39,6 +41,10 @@ class MockDatabaseService extends Mock implements DatabaseService {
   Stream<List<UnitModel>> allUnits(String ownerId) => Stream.value([]);
   @override
   Stream<List<ActionItem>> getActionItems(String ownerId) => Stream.value([]);
+  @override
+  Stream<List<NotificationModel>> getNotifications(String userId) => Stream.value([]);
+  @override
+  Stream<List<RentRecordModel>> getAllRentRecords(String ownerId) => Stream.value([]);
 }
 
 class MockAppModeProvider extends AppModeProvider {
@@ -103,7 +109,7 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          Provider<AuthService>.value(value: mockAuthService),
+          ChangeNotifierProvider<AuthService>.value(value: mockAuthService),
           Provider<PropertyService>.value(value: mockPropertyService),
           Provider<DatabaseService>.value(value: mockDatabaseService),
           Provider<FirebaseFirestore>.value(value: mockFirestore),

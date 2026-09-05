@@ -13,7 +13,7 @@ Future<void> showFeedbackDialog(BuildContext context, UserModel user) async {
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (context, setDialogState) => AlertDialog(
-        title: const Text('Share feedback'),
+        title: const Text('Help & Feedback'),
         content: SizedBox(
           width: 460,
           child: SingleChildScrollView(
@@ -40,9 +40,9 @@ Future<void> showFeedbackDialog(BuildContext context, UserModel user) async {
                   decoration: const InputDecoration(labelText: 'Category'),
                   items: const [
                     DropdownMenuItem(value: 'General', child: Text('General')),
-                    DropdownMenuItem(value: 'Bug', child: Text('Bug or issue')),
-                    DropdownMenuItem(value: 'Feature', child: Text('Feature request')),
-                    DropdownMenuItem(value: 'Usability', child: Text('Usability')),
+                    DropdownMenuItem(value: 'Bug', child: Text('Bug Report')),
+                    DropdownMenuItem(value: 'Feature', child: Text('Feature Request')),
+                    DropdownMenuItem(value: 'Help', child: Text('Help/Question')),
                   ],
                   onChanged: (value) => setDialogState(() => category = value ?? 'General'),
                 ),
@@ -53,7 +53,7 @@ Future<void> showFeedbackDialog(BuildContext context, UserModel user) async {
                   maxLines: 6,
                   decoration: const InputDecoration(
                     labelText: 'Comments',
-                    hintText: 'Tell us what is working or what needs improvement',
+                    hintText: 'Report a bug, request a feature, or ask for help',
                     border: OutlineInputBorder(),
                   ),
                 ),

@@ -160,6 +160,20 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────────────────────
+    // Notifications (scoped by ownerId)
+    // ─────────────────────────────────────────────────────────
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() &&
+        resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() &&
+        request.resource.data.ownerId == request.auth.uid;
+      allow update: if isSignedIn() &&
+        resource.data.ownerId == request.auth.uid;
+      allow delete: if isSignedIn() &&
+        resource.data.ownerId == request.auth.uid;
+    }
+
+    // ─────────────────────────────────────────────────────────
     // Visitors (society mode — any member can read/write)
     // ─────────────────────────────────────────────────────────
     match /visitors/{visitorId} {

@@ -376,10 +376,7 @@ class AppRouter {
             path: '/settings/account_security',
             builder: (context, state) => const _PlaceholderScreen(title: 'Account Security'),
           ),
-          GoRoute(
-            path: '/help_center',
-            builder: (context, state) => const _PlaceholderScreen(title: 'Help Center'),
-          ),
+
           GoRoute(
             path: '/report_issue',
             builder: (context, state) => const FeedbackScreen(),

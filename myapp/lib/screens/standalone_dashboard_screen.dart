@@ -255,7 +255,7 @@ class _StandaloneDashboardScreenState extends State<StandaloneDashboardScreen> {
 
   Widget _buildNotificationBell(BuildContext context, DatabaseService databaseService, String userId) {
     return StreamBuilder<List<NotificationModel>>(
-      stream: databaseService.getNotifications(userId),
+      stream: databaseService.getNotifications(userId) ?? const Stream.empty(),
       builder: (context, snapshot) {
         int unreadCount = 0;
         if (snapshot.hasData) {
