@@ -32,10 +32,14 @@ Map<String, dynamic> _calculateSummary(Map<String, dynamic> data) {
   final records = data['records'] as List<RentRecordModel>;
 
   final occupiedUnits = units.where((unit) => unit.isOccupied).length;
-  
+  final unitMap = {for (var unit in units) unit.id: unit};
+
   final pendingTotal = records
       .where((r) => r.status != RentStatus.paid)
-      .fold<double>(0, (sum, r) => sum + r.amount);
+      .fold<double>(0, (sum, r) {
+        final liveRent = unitMap[r.unitId]?.monthlyRent ?? r.amount;
+        return sum + (liveRent > 0 ? liveRent : r.amount);
+      });
 
   final collectedTotal = records
       .where((r) => r.status == RentStatus.paid)
@@ -333,17 +337,19 @@ class _StandaloneDashboardScreenState extends State<StandaloneDashboardScreen> {
   }
 
   Widget _buildSummaryCards(DatabaseService databaseService, UserModel user) {
-    final firestore = Provider.of<FirebaseFirestore>(context, listen: false);
     final summaryStream = CombineLatestStream.combine3(
       databaseService.getProperties(user.uid).onErrorReturn(<PropertyModel>[]),
       databaseService.allUnits(user.uid).onErrorReturn(<UnitModel>[]),
-      firestore.collection('rentRecords').where('ownerId', isEqualTo: user.uid).snapshots().map((s) => s.docs.map((d) => RentRecordModel.fromFirestore(d)).toList()),
+      databaseService.getAllRentRecords(user.uid).onErrorReturn(<RentRecordModel>[]),
       (List<PropertyModel> p, List<UnitModel> u, List<RentRecordModel> r) => {'properties': p, 'units': u, 'records': r},
     ).debounceTime(const Duration(milliseconds: 300));
 
     return StreamBuilder<Map<String, dynamic>>(
       stream: summaryStream,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Text('Unable to load portfolio summary: ${snapshot.error}');
+        }
         if (!snapshot.hasData) {
           return const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()));
         }
@@ -455,6 +461,21 @@ class _ActionCenterListState extends State<_ActionCenterList> {
       for (var item in selected) _itemKey(item): DateTime.now()
     };
 
+    final List<ActionItem> recordsToMark = [];
+    for (final item in selected) {
+      if (item.rentRecordIds.isNotEmpty) {
+        for (final rentRecordId in item.rentRecordIds) {
+          final recordItem = allItems.firstWhere(
+            (candidate) => candidate.rentRecordId == rentRecordId,
+            orElse: () => item,
+          );
+          recordsToMark.add(recordItem);
+        }
+      } else {
+        recordsToMark.add(item);
+      }
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -555,7 +576,7 @@ class _ActionCenterListState extends State<_ActionCenterList> {
 
     setState(() => _isProcessing = true);
     int success = 0;
-    for (final item in selected) {
+    for (final item in recordsToMark) {
       try {
         final paymentDate = selectedDates[_itemKey(item)] ?? DateTime.now();
         if (item.rentRecordId != null) {
@@ -593,6 +614,9 @@ class _ActionCenterListState extends State<_ActionCenterList> {
     return StreamBuilder<List<ActionItem>>(
       stream: widget.databaseService.getActionItems(widget.user.uid).debounceTime(const Duration(milliseconds: 300)),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Text('Unable to load rent dues: ${snapshot.error}');
+        }
         if (!snapshot.hasData) return const SizedBox.shrink();
         final actionItems = snapshot.data!;
 
@@ -662,9 +686,11 @@ class _ActionCenterListState extends State<_ActionCenterList> {
                       BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
                     ],
                   ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    onTap: () {
+                  child: Material(
+                    color: Colors.transparent,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      onTap: () {
                       setState(() {
                         if (isSelected) {
                           _selectedKeys.remove(_itemKey(item));
@@ -672,8 +698,8 @@ class _ActionCenterListState extends State<_ActionCenterList> {
                           _selectedKeys.add(_itemKey(item));
                         }
                       });
-                    },
-                    leading: Checkbox(
+                      },
+                      leading: Checkbox(
                       value: isSelected,
                       onChanged: (val) {
                         setState(() {
@@ -685,9 +711,9 @@ class _ActionCenterListState extends State<_ActionCenterList> {
                         });
                       },
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                    ),
-                    title: Text(item.tenant.name, style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
-                    subtitle: Column(
+                      ),
+                      title: Text(item.tenant.name, style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+                      subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(item.subtitle, style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600)),
@@ -704,8 +730,8 @@ class _ActionCenterListState extends State<_ActionCenterList> {
                           ),
                         ),
                       ],
-                    ),
-                    trailing: Column(
+                      ),
+                      trailing: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -715,6 +741,7 @@ class _ActionCenterListState extends State<_ActionCenterList> {
                         ),
                         Text('Rent', style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
                       ],
+                      ),
                     ),
                   ),
                 );
@@ -735,7 +762,7 @@ class ResponsiveCentered extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1000),
+        constraints: const BoxConstraints(maxWidth: 1440),
         child: child,
       ),
     );

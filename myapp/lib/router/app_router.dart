@@ -44,6 +44,7 @@ import 'package:myapp/screens/community/document_library_screen.dart';
 import 'package:myapp/screens/resident/resident_dashboard_screen.dart';
 import 'package:myapp/screens/resident/ledger_screens.dart';
 import 'package:myapp/screens/more_menu_screen.dart';
+import 'package:myapp/screens/feedback_screen.dart';
 import 'package:myapp/screens/admin/invite_member_screen.dart';
 import 'package:myapp/screens/admin/society_settings_screen.dart';
 import 'package:myapp/models/property_model.dart';
@@ -381,7 +382,7 @@ class AppRouter {
           ),
           GoRoute(
             path: '/report_issue',
-            builder: (context, state) => const _PlaceholderScreen(title: 'Report an Issue'),
+            builder: (context, state) => const FeedbackScreen(),
           ),
         ],
       ),

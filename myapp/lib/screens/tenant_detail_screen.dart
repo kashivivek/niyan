@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/models/property_model.dart';
+import 'package:myapp/models/unit_model.dart';
 import 'package:myapp/models/rent_status.dart';
 import 'package:myapp/models/tenant_model.dart';
 import 'package:myapp/models/user_model.dart';
@@ -12,6 +13,7 @@ import 'package:myapp/providers/theme_provider.dart';
 import 'package:myapp/utils/currency_helper.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:rxdart/rxdart.dart';
 
 class TenantDetailScreen extends StatelessWidget {
   final TenantModel? tenant;
@@ -259,11 +261,18 @@ class TenantDetailScreen extends StatelessWidget {
     if (tenant.propertyId.isEmpty) {
       return _buildInfoRow(Icons.home_work_outlined, 'Unit: ${tenant.assignedUnitId}');
     }
-    return StreamBuilder<PropertyModel>(
-      stream: databaseService.getPropertyStream(tenant.propertyId),
+    return StreamBuilder<List<dynamic>>(
+      stream: CombineLatestStream.combine2(
+        databaseService.getPropertyStream(tenant.propertyId),
+        databaseService.getUnitStream(tenant.assignedUnitId, tenant.propertyId),
+        (property, unit) => [property, unit],
+      ),
       builder: (context, snapshot) {
-        final propertyName = snapshot.data?.name ?? tenant.propertyId;
-        final label = '$propertyName  ·  Unit: ${tenant.assignedUnitId}';
+        final property = snapshot.data?[0] as PropertyModel?;
+        final unit = snapshot.data?[1] as UnitModel?;
+        final propertyName = property?.name ?? 'Property unavailable';
+        final unitName = unit?.unitNumber ?? 'Not assigned';
+        final label = '$propertyName  ·  Unit: $unitName';
         return _buildInfoRow(Icons.home_work_outlined, label);
       },
     );

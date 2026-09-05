@@ -57,7 +57,7 @@ class AuthService extends ChangeNotifier {
       return _userFromFirebaseUser(user);
     } catch (e) {
       debugPrint(e.toString());
-      return null;
+      rethrow;
     }
   }
 
@@ -187,8 +187,8 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> attemptAutoLogin() async {
+    final prefs = await SharedPreferences.getInstance();
     try {
-      final prefs = await SharedPreferences.getInstance();
       final enabled = prefs.getBool('remember_me_enabled') ?? false;
       if (!enabled) return;
 
@@ -208,6 +208,9 @@ class AuthService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Auto-login failed: $e');
+      await prefs.remove('remember_me_email');
+      await prefs.remove('remember_me_password');
+      await prefs.setBool('remember_me_enabled', false);
     }
   }
 

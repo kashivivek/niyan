@@ -8,6 +8,7 @@ import 'package:myapp/services/auth_service.dart';
 import 'package:myapp/providers/theme_provider.dart';
 import 'package:myapp/providers/app_mode_provider.dart';
 import 'package:myapp/l10n/generated/app_localizations.dart';
+import 'package:myapp/widgets/feedback_dialog.dart';
 
 class MoreMenuScreen extends StatelessWidget {
   const MoreMenuScreen({super.key});
@@ -87,7 +88,14 @@ class MoreMenuScreen extends StatelessWidget {
               const SizedBox(height: 24),
               _buildSectionHeader(AppLocalizations.of(context)?.support ?? 'Support'),
               _buildMenuTile(context, AppLocalizations.of(context)?.helpCenter ?? 'Help Center', Icons.help_outline_rounded, () => context.push('/help_center')),
-              _buildMenuTile(context, AppLocalizations.of(context)?.reportAnIssue ?? 'Report an Issue', Icons.bug_report_outlined, () => context.push('/report_issue')),
+              _buildMenuTile(
+                context,
+                AppLocalizations.of(context)?.reportAnIssue ?? 'Report an Issue',
+                Icons.bug_report_outlined,
+                () {
+                  if (user != null) showFeedbackDialog(context, user);
+                },
+              ),
 
               const SizedBox(height: 40),
               _buildLogoutButton(context),
@@ -203,23 +211,26 @@ class MoreMenuScreen extends StatelessWidget {
           BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
-      child: ListTile(
-        onTap: onTap,
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: effectiveColor.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(10),
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          onTap: onTap,
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: effectiveColor.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: effectiveColor, size: 20),
           ),
-          child: Icon(icon, color: effectiveColor, size: 20),
+          title: Text(
+            title,
+            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: Theme.of(context).colorScheme.primary),
+          ),
+          trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         ),
-        title: Text(
-          title,
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: Theme.of(context).colorScheme.primary),
-        ),
-        trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
     );
   }

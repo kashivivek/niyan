@@ -1,0 +1,14 @@
+{
+  "name": "tool",
+  "version": "1.0.0",
+  "description": "",
+  "main": "repair_shared_tenants.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "dependencies": {
+    "firebase-admin": "^14.3.0"
+  }
+}

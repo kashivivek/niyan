@@ -35,7 +35,7 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: isDesktop ? 960 : double.infinity),
+          constraints: BoxConstraints(maxWidth: isDesktop ? 1440 : double.infinity),
           child: Column(
         children: [
           // View Mode Toggle

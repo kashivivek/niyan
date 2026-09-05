@@ -12,8 +12,8 @@ import 'package:myapp/services/database_service.dart';
 import 'package:myapp/models/sos_model.dart';
 import 'package:myapp/services/sos_service.dart';
 import 'package:myapp/widgets/responsive_layout.dart';
+import 'package:myapp/widgets/feedback_dialog.dart';
 import 'package:myapp/l10n/generated/app_localizations.dart';
-import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class MainNavigationScreen extends StatefulWidget {
@@ -243,31 +243,37 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           // Top Right: Profile Avatar (with photo or icon fallback)
           Align(
             alignment: Alignment.centerRight,
-            child: GestureDetector(
-              onTap: () => context.go('/more'),
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: ThemeProvider.accentTeal.withOpacity(0.4), width: 1.5),
-                ),
-                child: Builder(builder: (ctx) {
-                  final u = Provider.of<UserModel?>(ctx);
-                  if (u?.photoUrl != null && u!.photoUrl!.isNotEmpty) {
-                    return CircleAvatar(
-                      radius: 14,
-                      backgroundImage: NetworkImage(u.photoUrl!),
-                      onBackgroundImageError: (_, __) {},
-                    );
-                  }
-                  return CircleAvatar(
-                    radius: 14,
-                    backgroundColor: ThemeProvider.accentTeal.withOpacity(0.1),
-                    child: const Icon(Icons.person_rounded, size: 16, color: ThemeProvider.accentTeal),
-                  );
-                }),
-              ),
-            ),
+            child: Builder(builder: (ctx) {
+              final u = Provider.of<UserModel?>(ctx);
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Send feedback',
+                    icon: Icon(Icons.feedback_outlined, color: headerColor, size: 22),
+                    onPressed: u == null ? null : () => showFeedbackDialog(context, u),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => context.go('/more'),
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: ThemeProvider.accentTeal.withOpacity(0.4), width: 1.5),
+                      ),
+                      child: u?.photoUrl != null && u!.photoUrl!.isNotEmpty
+                          ? CircleAvatar(radius: 14, backgroundImage: NetworkImage(u.photoUrl!), onBackgroundImageError: (_, __) {})
+                          : CircleAvatar(
+                              radius: 14,
+                              backgroundColor: ThemeProvider.accentTeal.withOpacity(0.1),
+                              child: const Icon(Icons.person_rounded, size: 16, color: ThemeProvider.accentTeal),
+                            ),
+                    ),
+                  ),
+                ],
+              );
+            }),
           ),
         ],
       ),
@@ -295,20 +301,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           : const Stream.empty(),
       builder: (context, snapshot) {
         final unreadCount = (snapshot.data ?? []).where((n) => n.isRead == false).length;
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!kIsWeb) {
-            FlutterAppBadger.isAppBadgeSupported().then((supported) {
-              if (supported) {
-                if (unreadCount > 0) {
-                  FlutterAppBadger.updateBadgeCount(unreadCount);
-                } else {
-                  FlutterAppBadger.removeBadge();
-                }
-              }
-            }).catchError((_) {});
-          }
-        });
 
         Widget buildNavIcon(int idx, _NavItem item, bool isSelected, {bool compact = false}) {
           final isAlerts = item.route == '/notifications';

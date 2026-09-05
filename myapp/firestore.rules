@@ -109,9 +109,11 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────
     match /tenants/{tenantId} {
       allow read, write: if isSignedIn() &&
-        hasPropertyAccess(resource.data.propertyId);
+        (resource.data.ownerId == request.auth.uid ||
+         hasPropertyAccess(resource.data.propertyId));
       allow create: if isSignedIn() &&
-        hasPropertyAccess(request.resource.data.propertyId);
+        (request.resource.data.ownerId == request.auth.uid ||
+         hasPropertyAccess(request.resource.data.propertyId));
     }
 
     // ─────────────────────────────────────────────────────────
@@ -119,9 +121,11 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────
     match /transactions/{transactionId} {
       allow read, write: if isSignedIn() &&
-        hasPropertyAccess(resource.data.propertyId);
+        (resource.data.ownerId == request.auth.uid ||
+         hasPropertyAccess(resource.data.propertyId));
       allow create: if isSignedIn() &&
-        hasPropertyAccess(request.resource.data.propertyId);
+        (request.resource.data.ownerId == request.auth.uid ||
+         hasPropertyAccess(request.resource.data.propertyId));
     }
 
     // ─────────────────────────────────────────────────────────
@@ -129,9 +133,30 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────
     match /rentRecords/{recordId} {
       allow read, write: if isSignedIn() &&
-        hasPropertyAccess(resource.data.propertyId);
+        (resource.data.ownerId == request.auth.uid ||
+         hasPropertyAccess(resource.data.propertyId));
       allow create: if isSignedIn() &&
-        hasPropertyAccess(request.resource.data.propertyId);
+        (request.resource.data.ownerId == request.auth.uid ||
+         hasPropertyAccess(request.resource.data.propertyId));
+    }
+
+    // User feedback and the fixed-destination mail queue.
+    match /feedback/{feedbackId} {
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.rating is int &&
+        request.resource.data.rating >= 1 &&
+        request.resource.data.rating <= 5 &&
+        request.resource.data.comment is string &&
+        request.resource.data.comment.size() >= 3 &&
+        request.resource.data.comment.size() <= 2000;
+      allow read, update, delete: if false;
+    }
+
+    match /mail/{mailId} {
+      allow create: if isSignedIn() &&
+        request.resource.data.to == 'kashivivek@gmail.com';
+      allow read, update, delete: if false;
     }
 
     // ─────────────────────────────────────────────────────────

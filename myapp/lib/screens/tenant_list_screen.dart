@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:myapp/models/property_model.dart';
 import 'package:myapp/models/tenant_model.dart';
 import 'package:myapp/services/database_service.dart';
 import 'package:myapp/screens/add_tenant_screen.dart';
@@ -9,6 +10,8 @@ import 'package:myapp/providers/theme_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/l10n/generated/app_localizations.dart';
+import 'package:myapp/models/unit_model.dart';
+import 'package:rxdart/rxdart.dart';
 
 class TenantListScreen extends StatelessWidget {
   const TenantListScreen({super.key});
@@ -24,8 +27,13 @@ class TenantListScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: StreamBuilder<List<TenantModel>>(
-        stream: databaseService.getAllTenants(user.uid),
+      body: StreamBuilder<List<dynamic>>(
+        stream: CombineLatestStream.combine3(
+          databaseService.getAllTenants(user.uid),
+          databaseService.allUnits(user.uid),
+          databaseService.getProperties(user.uid),
+          (tenants, units, properties) => [tenants, units, properties],
+        ),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -33,7 +41,15 @@ class TenantListScreen extends StatelessWidget {
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
-          final tenants = snapshot.data ?? [];
+          final tenants = (snapshot.data?[0] as List<TenantModel>?) ?? [];
+          final units = (snapshot.data?[1] as List<UnitModel>?) ?? [];
+          final properties = (snapshot.data?[2] as List<PropertyModel>?) ?? [];
+          final unitById = {for (final unit in units) unit.id: unit};
+          final propertyById = {for (final property in properties) property.id: property};
+          final unitByTenantId = {
+            for (final unit in units)
+              if (unit.currentTenantId != null) unit.currentTenantId!: unit,
+          };
           if (tenants.isEmpty) {
             return _buildEmptyState(context);
           }
@@ -48,7 +64,13 @@ class TenantListScreen extends StatelessWidget {
             ),
             itemCount: tenants.length,
             itemBuilder: (context, index) {
-              return TenantCard(tenant: tenants[index]);
+              final tenant = tenants[index];
+              final unit = unitById[tenant.assignedUnitId] ?? unitByTenantId[tenant.id];
+              return TenantCard(
+                tenant: tenant,
+                propertyName: propertyById[tenant.propertyId]?.name,
+                unitNumber: unit?.unitNumber,
+              );
             },
           );
         },
@@ -81,8 +103,10 @@ class TenantListScreen extends StatelessWidget {
 
 class TenantCard extends StatelessWidget {
   final TenantModel tenant;
+  final String? propertyName;
+  final String? unitNumber;
 
-  const TenantCard({super.key, required this.tenant});
+  const TenantCard({super.key, required this.tenant, this.propertyName, this.unitNumber});
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +158,7 @@ class TenantCard extends StatelessWidget {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                'Unit ${tenant.assignedUnitId}',
+                                '${propertyName ?? 'Property unavailable'} · Unit ${unitNumber ?? 'Not assigned'}',
                                 style: TextStyle(color: Colors.teal.shade600, fontSize: 11, fontWeight: FontWeight.w500),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,

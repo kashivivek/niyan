@@ -10,9 +10,10 @@ class ActionItem {
   final bool isOverdue;
   final DateTime dueDate;
   final String month;
-  final String propertyName; 
-  final String unitNumber;   
+  final String propertyName;
+  final String unitNumber;
   final String? rentRecordId;
+  final List<String> rentRecordIds;
   final String propertyId;
   final String unitId;
 
@@ -27,6 +28,7 @@ class ActionItem {
     this.propertyName = '',
     this.unitNumber = '',
     this.rentRecordId,
+    this.rentRecordIds = const [],
     this.propertyId = '',
     this.unitId = '',
   });

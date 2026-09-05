@@ -42,6 +42,10 @@
 **/android/.gradle/
 **/android/build/
 **/android/local.properties
+**/android/key.properties
+**/*.jks
+**/*.keystore
+**/*.p12
 
 # iOS/macOS
 **/ios/Pods/

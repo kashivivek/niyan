@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:myapp/models/upcoming_due_model.dart';
@@ -21,6 +22,180 @@ import 'package:firebase_auth/firebase_auth.dart';
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   String get currentOwnerId => FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  static const String feedbackDestination = 'kashivivek@gmail.com';
+
+  Future<void> submitFeedback({
+    required String userId,
+    required String userEmail,
+    required int rating,
+    required String category,
+    required String comment,
+  }) async {
+    final trimmedComment = comment.trim();
+    if (rating < 1 || rating > 5) {
+      throw ArgumentError('Rating must be between 1 and 5.');
+    }
+    if (trimmedComment.length < 3 || trimmedComment.length > 2000) {
+      throw ArgumentError('Feedback must be between 3 and 2000 characters.');
+    }
+
+    final feedbackRef = _db.collection('feedback').doc();
+    final mailRef = _db.collection('mail').doc();
+    final platform = kIsWeb ? 'web' : 'mobile';
+
+    final feedback = {
+      'userId': userId,
+      'userEmail': userEmail,
+      'rating': rating,
+      'category': category,
+      'comment': trimmedComment,
+      'platform': platform,
+      'createdAt': FieldValue.serverTimestamp(),
+      'status': 'new',
+    };
+
+    final mail = {
+      'to': feedbackDestination,
+      'replyTo': userEmail,
+      'message': {
+        'subject': 'Niyan feedback ($rating/5) - $category',
+        'text': [
+          'New feedback from Niyan.',
+          'From: $userEmail',
+          'Platform: $platform',
+          'Rating: $rating/5',
+          'Category: $category',
+          '',
+          trimmedComment,
+        ].join('\n'),
+      },
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+
+    final batch = _db.batch();
+    batch.set(feedbackRef, feedback);
+    batch.set(mailRef, mail);
+    await batch.commit();
+  }
+
+  static double _effectiveRentAmountForRecord({
+    required RentRecordModel record,
+    required UnitModel? unit,
+    required TenantModel? tenant,
+  }) {
+    if (record.status == RentStatus.paid) {
+      return record.amount;
+    }
+
+    final liveRent = unit?.monthlyRent ?? tenant?.rentAmount ?? record.amount;
+    final hasRecurringRentTitle = record.title == 'Monthly Rent' ||
+        record.title == 'Prorated Rent' ||
+        record.title.contains('Rent');
+
+    if (hasRecurringRentTitle && liveRent > 0) {
+      return liveRent;
+    }
+
+    return record.amount;
+  }
+
+  static List<ActionItem> buildActionItems({
+    required List<RentRecordModel> records,
+    required List<TenantModel> tenants,
+    required List<PropertyModel> properties,
+    required List<UnitModel> units,
+    String? ownerId,
+  }) {
+    final tenantMap = {for (var t in tenants) t.id: t};
+    final propertyMap = {for (var p in properties) p.id: p};
+    final unitMap = {for (var u in units) u.id: u};
+
+    final today = DateTime.now();
+    final limitDate = today.add(const Duration(days: 7));
+
+    final grouped = <String, List<RentRecordModel>>{};
+
+    for (final record in records) {
+      if (record.status == RentStatus.paid) continue;
+      if (record.dueDate.isAfter(limitDate)) continue;
+
+      final unitTenantId = unitMap[record.unitId]?.currentTenantId;
+      final resolvedTenantId = tenantMap.containsKey(record.tenantId)
+          ? record.tenantId
+          : (unitTenantId?.isNotEmpty == true ? unitTenantId! : record.tenantId);
+      final key = '$resolvedTenantId|${record.propertyId}|${record.unitId}';
+      grouped.putIfAbsent(key, () => <RentRecordModel>[]).add(record);
+    }
+
+    final items = grouped.entries.map((entry) {
+      final recordGroup = entry.value
+        ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+
+        final firstRecord = recordGroup.first;
+        final unit = unitMap[firstRecord.unitId];
+        final resolvedTenantId = tenantMap.containsKey(firstRecord.tenantId)
+          ? firstRecord.tenantId
+          : unit?.currentTenantId ?? firstRecord.tenantId;
+        final tenant = tenantMap[resolvedTenantId] ??
+          TenantModel(
+          id: resolvedTenantId,
+            name: 'Unknown',
+            ownerId: ownerId ?? firstRecord.ownerId,
+            propertyId: firstRecord.propertyId,
+            moveInDate: DateTime.now(),
+            dueDate: firstRecord.dueDate,
+            assignedUnitId: firstRecord.unitId,
+          );
+
+          final resolvedPropertyId = propertyMap.containsKey(firstRecord.propertyId)
+            ? firstRecord.propertyId
+            : tenant.propertyId;
+          final resolvedUnitId = unitMap.containsKey(firstRecord.unitId)
+            ? firstRecord.unitId
+            : tenant.assignedUnitId;
+          final property = propertyMap[resolvedPropertyId];
+          final resolvedUnit = unitMap[resolvedUnitId];
+      final isOverdue = recordGroup.any((record) => today.isAfter(record.dueDate));
+      final totalAmount = recordGroup.fold<double>(0, (sum, record) {
+        final effectiveAmount = _effectiveRentAmountForRecord(
+          record: record,
+          unit: unitMap[record.unitId] ?? resolvedUnit,
+          tenant: tenantMap[resolvedTenantId],
+        );
+        return sum + effectiveAmount;
+      });
+
+      final months = recordGroup
+          .map((record) => DateFormat('MMM yyyy').format(record.dueDate))
+          .toSet()
+          .toList()
+        ..sort((a, b) => DateFormat('MMM yyyy').parse(a).compareTo(DateFormat('MMM yyyy').parse(b)));
+
+      return ActionItem(
+        tenant: tenant,
+        title: tenant.name,
+        subtitle: [
+          '${isOverdue ? 'Overdue' : 'Due'}: ${DateFormat('d MMM yyyy').format(firstRecord.dueDate)}${recordGroup.length > 1 ? ' → ${DateFormat('d MMM yyyy').format(recordGroup.last.dueDate)}' : ''}',
+          if (property != null) property.name,
+          'Unit ${resolvedUnit?.unitNumber ?? 'N/A'}',
+        ].join(' · '),
+        amount: totalAmount,
+        isOverdue: isOverdue,
+        dueDate: firstRecord.dueDate,
+        month: months.join(', '),
+        propertyName: property?.name ?? '',
+        unitNumber: resolvedUnit?.unitNumber ?? '',
+        rentRecordId: firstRecord.id,
+        rentRecordIds: recordGroup.map((record) => record.id).toList(),
+        propertyId: resolvedPropertyId,
+        unitId: resolvedUnitId,
+      );
+    }).toList()
+      ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+
+    return items;
+  }
 
   // Users
   Future<void> setUser(String uid, Map<String, dynamic> data) {
@@ -316,16 +491,17 @@ class DatabaseService {
     return getProperties(ownerId).switchMap((properties) {
       final streams = <Stream<List<TenantModel>>>[];
 
-      // 1. All tenants owned by the user (assigned and unassigned)
+      // Keep unassigned tenants owned by the user visible.
       streams.add(_db
           .collection('tenants')
           .where('ownerId', isEqualTo: ownerId)
           .snapshots()
           .map((snapshot) => snapshot.docs
               .map((doc) => TenantModel.fromFirestore(doc))
-              .toList()));
+              .toList())
+            .onErrorReturn(<TenantModel>[]));
 
-      // 2. All tenants for properties the user owns or co-owns
+      // Co-owner access is resolved through the accessible property query.
       for (var prop in properties) {
         streams.add(_db
             .collection('tenants')
@@ -333,7 +509,8 @@ class DatabaseService {
             .snapshots()
             .map((snapshot) => snapshot.docs
                 .map((doc) => TenantModel.fromFirestore(doc))
-                .toList()));
+              .toList())
+            .onErrorReturn(<TenantModel>[]));
       }
 
       return CombineLatestStream.list(streams).map((listOfLists) {
@@ -608,51 +785,13 @@ class DatabaseService {
       getProperties(ownerId),
       allUnits(ownerId),
       (List<RentRecordModel> records, tenants, properties, units) {
-        final tenantMap = {for (var t in tenants) t.id: t};
-        final propertyMap = {for (var p in properties) p.id: p};
-        final unitMap = {for (var u in units) u.id: u};
-
-        final today = DateTime.now();
-        final limitDate = today.add(const Duration(days: 7));
-
-        return records
-            .where((r) => r.status != RentStatus.paid)
-            .where((r) => r.dueDate.isBefore(limitDate))
-            .map((r) {
-          final tenant = tenantMap[r.tenantId];
-          final prop = propertyMap[r.propertyId];
-          final unit = unitMap[r.unitId];
-          final isOverdue = today.isAfter(r.dueDate);
-
-          return ActionItem(
-            tenant: tenant ??
-                TenantModel(
-                  id: r.tenantId,
-                  name: 'Unknown',
-                  ownerId: ownerId,
-                  propertyId: r.propertyId,
-                  moveInDate: DateTime.now(),
-                  dueDate: r.dueDate,
-                  assignedUnitId: r.unitId,
-                ),
-            title: tenant != null ? tenant.name : r.title,
-            subtitle: [
-              '${isOverdue ? 'Overdue' : 'Due'}: ${DateFormat('d MMM yyyy').format(r.dueDate)}',
-              if (prop != null) prop.name,
-              'Unit ${unit?.unitNumber ?? 'N/A'}',
-            ].join(' · '),
-            amount: r.amount,
-            isOverdue: isOverdue,
-            dueDate: r.dueDate,
-            month: r.month,
-            propertyName: prop?.name ?? '',
-            unitNumber: unit?.unitNumber ?? '',
-            rentRecordId: r.id,
-            propertyId: r.propertyId,
-            unitId: r.unitId,
-          );
-        }).toList()
-          ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+        return buildActionItems(
+          records: records,
+          tenants: tenants,
+          properties: properties,
+          units: units,
+          ownerId: ownerId,
+        );
       },
     );
   }
@@ -832,8 +971,6 @@ class DatabaseService {
       if (!assignedElsewhere) {
         batch.update(tenantRef, {
           'isAssignedToUnit': false,
-          'assignedUnitId': '',
-          'propertyId': '',
           'status': TenantStatus.past.toString(),
         });
       }
