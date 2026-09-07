@@ -48,6 +48,7 @@ class TenantService {
         .collection('tenants')
         .doc(tenantId)
         .snapshots()
+        .where((doc) => doc.exists && doc.data() != null)
         .map((doc) => TenantModel.fromFirestore(doc));
   }
 
@@ -72,7 +73,10 @@ class TenantService {
   }
 
   Future<void> updateTenant(TenantModel tenant) {
-    return _db.collection('tenants').doc(tenant.id).update(tenant.toFirestore());
+    return _db
+        .collection('tenants')
+        .doc(tenant.id)
+        .set(tenant.toFirestore(), SetOptions(merge: true));
   }
 
   Future<void> updateTenantPhotoUrl(String tenantId, String photoUrl) {

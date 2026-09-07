@@ -117,6 +117,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   _buildMaintenanceSection(context, databaseService, currentProperty),
                   _buildActionsSection(context, databaseService, currentProperty),
                   _buildUnitsSection(context, databaseService, currentProperty, user),
+                  const SizedBox(height: 120),
                 ]),
               ),
             ],

@@ -101,6 +101,7 @@ class PropertyService {
         .collection('units')
         .doc(unitId)
         .snapshots()
+        .where((snapshot) => snapshot.exists && snapshot.data() != null)
         .map((snapshot) => UnitModel.fromFirestore(snapshot));
   }
 

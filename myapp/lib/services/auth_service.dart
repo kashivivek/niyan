@@ -73,40 +73,47 @@ class AuthService extends ChangeNotifier {
       User? user = result.user;
       if (user != null) {
         // --- Automated Tenant Onboarding ---
-        // Check if this email is already registered as a tenant in any society
-        final tenantQuery = await _db.collection('tenants')
-            .where('email', isEqualTo: email)
-            .limit(1)
-            .get();
-
+        // Check if this email is already registered as a tenant in any society.
+        // This query may fail with permission-denied for brand-new users because
+        // the tenants collection is scoped by ownerId. We catch and skip gracefully.
         String? autoSocietyId;
         bool isAutoResident = false;
 
-        if (tenantQuery.docs.isNotEmpty) {
-          final tenantData = tenantQuery.docs.first.data();
-          final String? foundSocietyId = tenantData['societyId'] as String?;
-          
-          // Only auto-onboard if the tenant is associated with a society
-          if (foundSocietyId != null) {
-            autoSocietyId = foundSocietyId;
-            isAutoResident = true;
-            
-            // 1. Add to society's member list
-            await _db.collection('societies').doc(autoSocietyId).update({
-              'memberIds': FieldValue.arrayUnion([user.uid])
-            });
+        try {
+          final tenantQuery = await _db.collection('tenants')
+              .where('email', isEqualTo: email)
+              .limit(1)
+              .get();
 
-            // 2. Create the member record
-            await _db.collection('societies').doc(autoSocietyId).collection('members').doc(user.uid).set({
-              'id': user.uid,
-              'societyId': autoSocietyId,
-              'role': 'SocietyRole.tenant',
-              'displayName': name,
-              'status': 'MemberStatus.active',
-              'joinedAt': FieldValue.serverTimestamp(),
-              'unitIds': [tenantData['assignedUnitId']],
-            });
+          if (tenantQuery.docs.isNotEmpty) {
+            final tenantData = tenantQuery.docs.first.data();
+            final String? foundSocietyId = tenantData['societyId'] as String?;
+            
+            // Only auto-onboard if the tenant is associated with a society
+            if (foundSocietyId != null) {
+              autoSocietyId = foundSocietyId;
+              isAutoResident = true;
+              
+              // 1. Add to society's member list
+              await _db.collection('societies').doc(autoSocietyId).update({
+                'memberIds': FieldValue.arrayUnion([user.uid])
+              });
+
+              // 2. Create the member record
+              await _db.collection('societies').doc(autoSocietyId).collection('members').doc(user.uid).set({
+                'id': user.uid,
+                'societyId': autoSocietyId,
+                'role': 'SocietyRole.tenant',
+                'displayName': name,
+                'status': 'MemberStatus.active',
+                'joinedAt': FieldValue.serverTimestamp(),
+                'unitIds': [tenantData['assignedUnitId']],
+              });
+            }
           }
+        } catch (e) {
+          // Permission denied or network error — skip auto-onboarding
+          debugPrint('Tenant auto-onboarding skipped: $e');
         }
 
         final userData = {

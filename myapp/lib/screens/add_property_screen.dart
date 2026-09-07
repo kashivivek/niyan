@@ -72,7 +72,7 @@ class AddPropertyScreenState extends State<AddPropertyScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 120),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: Form(

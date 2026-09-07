@@ -53,6 +53,8 @@
 **/DerivedData/
 
 # Firebase
+myapp/firebase
+**/firebase
 **/firebase_options.dart
 **/firebase-debug.log
 **/firebase-debug.*.log

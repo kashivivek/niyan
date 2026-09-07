@@ -394,11 +394,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > 900;
     
-    // 4 items visible, rest in overflow
-    const int maxVisible = 4;
+    // Dynamically decide how many items fit. Each item needs ~80px.
+    // On desktop (capped at 600px bar), all items always fit.
+    final double barWidth = isDesktop ? 600 : screenWidth - 40; // minus margins
+    final int fittableItems = (barWidth / 80).floor();
+    
+    // If all items fit, show them all. Otherwise reserve one slot for "More".
+    final bool needsOverflow = fittableItems < items.length;
+    final int maxVisible = needsOverflow ? (fittableItems - 1).clamp(2, items.length) : items.length;
     final visibleItems = items.take(maxVisible).toList();
     final overflowItems = items.skip(maxVisible).toList();
-    final bool isMoreSelected = selectedIndex >= maxVisible;
+    final bool isMoreSelected = needsOverflow && selectedIndex >= maxVisible;
 
     return StreamBuilder<List<NotificationModel>>(
       stream: user != null

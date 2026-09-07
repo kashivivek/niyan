@@ -190,14 +190,7 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Image.asset(
-            'assets/images/logo_icon.png',
-            height: 64,
-            width: 64,
-            color: Theme.of(context).dividerColor,
-            colorBlendMode: BlendMode.srcIn,
-            errorBuilder: (context, error, stackTrace) => Icon(Icons.business_rounded, size: 64, color: Color(0xFFE5E7EB)),
-          ),
+          Icon(Icons.business_rounded, size: 64, color: Colors.grey.shade300),
           SizedBox(height: 16),
           Text(message, style: GoogleFonts.outfit(fontSize: 16, color: Colors.grey.shade400)),
         ],

@@ -49,7 +49,7 @@ class UnitDetailScreen extends StatelessWidget {
             ],
           ),
           body: SingleChildScrollView(
-            padding: EdgeInsets.all(24.0),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -60,12 +60,12 @@ class UnitDetailScreen extends StatelessWidget {
                 _buildTenancyHistory(context, currentUnit, databaseService),
                 const SizedBox(height: 24),
                 _buildRecentTransactions(currentUnit, databaseService, user?.currency),
-                const SizedBox(height: 80),
+                const SizedBox(height: 120),
               ],
             ),
           ),
           floatingActionButton: Padding(
-            padding: EdgeInsets.only(bottom: 80.0),
+            padding: EdgeInsets.only(bottom: 120.0),
             child: FloatingActionButton.extended(
               icon: Icon(Icons.add_rounded, color: Colors.white),
               label: Text('Add Transaction', style: TextStyle(color: Theme.of(context).cardColor, fontWeight: FontWeight.bold)),
@@ -412,7 +412,7 @@ class UnitDetailScreen extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           TextButton(
             onPressed: () async {
-              await databaseService.unassignTenantFromUnit(unitId: unit.id, tenantId: tenant.id, propertyId: unit.propertyId);
+              await databaseService.unassignTenantFromUnit(unitId: unit.id, tenantId: tenant.id, propertyId: unit.propertyId, ownerId: unit.ownerId);
               if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text('Move Out', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),

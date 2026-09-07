@@ -8,32 +8,114 @@ import 'package:myapp/models/tenant_model.dart';
 import 'package:myapp/models/user_model.dart';
 import 'package:myapp/models/rent_record_model.dart';
 import 'package:myapp/services/database_service.dart';
-import 'package:myapp/screens/edit_tenant_screen.dart';
 import 'package:myapp/providers/theme_provider.dart';
 import 'package:myapp/utils/currency_helper.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:rxdart/rxdart.dart';
+import 'dart:developer' as developer;
 
-class TenantDetailScreen extends StatelessWidget {
+class TenantDetailScreen extends StatefulWidget {
   final TenantModel? tenant;
   final String tenantId;
 
   const TenantDetailScreen({super.key, this.tenant, required this.tenantId});
 
   @override
+  State<TenantDetailScreen> createState() => _TenantDetailScreenState();
+}
+
+class _TenantDetailScreenState extends State<TenantDetailScreen> {
+  // Cached streams — created once, never recreated on rebuild
+  late Stream<TenantModel> _tenantStream;
+  late Stream<List<RentRecordModel>> _rentRecordsStream;
+
+  // Cached unit info (one-shot reads to avoid nested stream subscriptions)
+  String _propertyName = '';
+  String _unitName = '';
+  String? _lastPropertyId;
+  String? _lastUnitId;
+
+  @override
+  void initState() {
+    super.initState();
+    final databaseService = context.read<DatabaseService>();
+
+    // Create streams ONCE and cache them
+    _tenantStream = databaseService
+        .getTenantStream(widget.tenantId)
+        .handleError((error) {
+      developer.log('Tenant stream error (suppressed): $error');
+    });
+
+    _rentRecordsStream = databaseService
+        .getRentRecordsForTenant(widget.tenantId)
+        .handleError((error) {
+      developer.log('Rent records stream error (suppressed): $error');
+    });
+
+    // Pre-fetch unit info if initial data is available
+    if (widget.tenant != null &&
+        widget.tenant!.isAssignedToUnit &&
+        widget.tenant!.propertyId.isNotEmpty) {
+      _fetchUnitInfo(
+          databaseService, widget.tenant!.propertyId, widget.tenant!.assignedUnitId);
+    }
+  }
+
+  /// One-shot read for property & unit names — avoids nested snapshot listeners
+  Future<void> _fetchUnitInfo(
+      DatabaseService databaseService, String propertyId, String unitId) async {
+    // Skip if already loaded for this property+unit
+    if (propertyId == _lastPropertyId && unitId == _lastUnitId) return;
+    _lastPropertyId = propertyId;
+    _lastUnitId = unitId;
+
+    try {
+      final results = await Future.wait([
+        databaseService.getPropertyFuture(propertyId),
+        databaseService.getUnitFuture(unitId, propertyId),
+      ]);
+      if (mounted) {
+        setState(() {
+          _propertyName = (results[0] as PropertyModel?)?.name ?? 'Property unavailable';
+          _unitName = (results[1] as UnitModel?)?.unitNumber ?? 'Not assigned';
+        });
+      }
+    } catch (e) {
+      developer.log('Error fetching unit info: $e');
+      if (mounted) {
+        setState(() {
+          _propertyName = 'Property unavailable';
+          _unitName = 'Not assigned';
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final databaseService = Provider.of<DatabaseService>(context);
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
     final user = Provider.of<UserModel?>(context);
 
     return StreamBuilder<TenantModel>(
-      stream: databaseService.getTenantStream(tenantId),
-      initialData: tenant,
+      stream: _tenantStream,
+      initialData: widget.tenant,
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Tenant Profile')),
+            body: const Center(child: Text('Something went wrong. Please go back and try again.')),
+          );
+        }
         if (!snapshot.hasData) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         final currentTenant = snapshot.data!;
+
+        // Refresh unit info when tenant's assignment changes
+        if (currentTenant.isAssignedToUnit && currentTenant.propertyId.isNotEmpty) {
+          _fetchUnitInfo(databaseService, currentTenant.propertyId, currentTenant.assignedUnitId);
+        }
 
         return Scaffold(
           appBar: AppBar(
@@ -50,12 +132,12 @@ class TenantDetailScreen extends StatelessWidget {
             ],
           ),
           body: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
             child: Column(
               children: <Widget>[
                 _buildProfileHeader(context, currentTenant),
                 const SizedBox(height: 24),
-                _buildFinancialOverview(context, currentTenant, databaseService, user?.currency),
+                _buildFinancialOverview(context, currentTenant, user?.currency),
                 const SizedBox(height: 24),
                 _buildContactInfo(context, currentTenant),
                 const SizedBox(height: 32),
@@ -125,9 +207,10 @@ class TenantDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFinancialOverview(BuildContext context, TenantModel tenant, DatabaseService databaseService, String? currency) {
+  Widget _buildFinancialOverview(BuildContext context, TenantModel tenant, String? currency) {
+    // Uses the CACHED _rentRecordsStream — never recreated on rebuild
     return StreamBuilder<List<RentRecordModel>>(
-      stream: databaseService.getRentRecordsForTenant(tenant.id),
+      stream: _rentRecordsStream,
       builder: (context, snapshot) {
         final records = snapshot.data ?? [];
         final totalDue = records.where((r) => r.status == RentStatus.pending).fold(0.0, (sum, r) => sum + r.amount);
@@ -166,7 +249,7 @@ class TenantDetailScreen extends StatelessWidget {
           children: [
             Icon(icon, size: 16, color: color),
             const SizedBox(width: 8),
-            Text(label, style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
           ],
         ),
         const SizedBox(height: 4),
@@ -188,7 +271,6 @@ class TenantDetailScreen extends StatelessWidget {
         children: [
           const Text('Contact Information', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 24),
-          // Phone — tappable to call
           _buildPhoneRow(context, tenant.phoneNumber),
           const Divider(height: 32),
           _buildInfoRow(Icons.email_outlined, tenant.email ?? 'No email'),
@@ -256,26 +338,15 @@ class TenantDetailScreen extends StatelessWidget {
     );
   }
 
+  /// Uses cached property/unit names — NO nested StreamBuilder, NO CombineLatestStream
   Widget _buildUnitRow(BuildContext context, TenantModel tenant) {
-    final databaseService = Provider.of<DatabaseService>(context, listen: false);
     if (tenant.propertyId.isEmpty) {
       return _buildInfoRow(Icons.home_work_outlined, 'Unit: ${tenant.assignedUnitId}');
     }
-    return StreamBuilder<List<dynamic>>(
-      stream: CombineLatestStream.combine2(
-        databaseService.getPropertyStream(tenant.propertyId),
-        databaseService.getUnitStream(tenant.assignedUnitId, tenant.propertyId),
-        (property, unit) => [property, unit],
-      ),
-      builder: (context, snapshot) {
-        final property = snapshot.data?[0] as PropertyModel?;
-        final unit = snapshot.data?[1] as UnitModel?;
-        final propertyName = property?.name ?? 'Property unavailable';
-        final unitName = unit?.unitNumber ?? 'Not assigned';
-        final label = '$propertyName  ·  Unit: $unitName';
-        return _buildInfoRow(Icons.home_work_outlined, label);
-      },
-    );
+    final propertyName = _propertyName.isNotEmpty ? _propertyName : 'Loading...';
+    final unitName = _unitName.isNotEmpty ? _unitName : '...';
+    final label = '$propertyName  ·  Unit: $unitName';
+    return _buildInfoRow(Icons.home_work_outlined, label);
   }
 
   Widget _buildInfoRow(IconData icon, String text) {
@@ -303,7 +374,7 @@ class TenantDetailScreen extends StatelessWidget {
           TextButton(
             child: const Text('Unassign', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
             onPressed: () async {
-              await databaseService.unassignTenantFromUnit(tenantId: tenant.id, unitId: tenant.assignedUnitId, propertyId: tenant.propertyId);
+              await databaseService.unassignTenantFromUnit(tenantId: tenant.id, unitId: tenant.assignedUnitId, propertyId: tenant.propertyId, ownerId: tenant.ownerId);
               if (ctx.mounted) Navigator.pop(ctx);
             },
           ),
@@ -323,9 +394,18 @@ class TenantDetailScreen extends StatelessWidget {
           TextButton(
             child: const Text('Delete', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
             onPressed: () async {
-              await databaseService.deleteTenant(tenant.id);
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) context.pop();
+              try {
+                await databaseService.deleteTenant(tenant.id);
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (context.mounted) context.pop();
+              } catch (e) {
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+                  );
+                }
+              }
             },
           ),
         ],

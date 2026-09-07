@@ -28,10 +28,10 @@ class TenancyHistoryModel {
 
   Map<String, dynamic> toMap() {
     return {
-      'tenantId': tenantId,
       'unitId': unitId,
-      'startDate': startDate,
-      'endDate': endDate,
+      'tenantId': tenantId,
+      'startDate': Timestamp.fromDate(startDate),
+      'endDate': endDate != null ? Timestamp.fromDate(endDate!) : null,
     };
   }
 }

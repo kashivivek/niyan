@@ -18,7 +18,24 @@ class DocumentLibraryScreen extends StatelessWidget {
     final communityService = Provider.of<CommunityService>(context, listen: false);
 
     if (user == null || appMode.activeSociety == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(
+          title: Text('Document Library', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.folder_outlined, size: 64, color: Colors.grey.shade300),
+              const SizedBox(height: 16),
+              Text('Coming Soon', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey.shade400)),
+              const SizedBox(height: 8),
+              Text('Document Library is available in Society mode.', style: GoogleFonts.inter(fontSize: 14, color: Colors.grey.shade400)),
+            ],
+          ),
+        ),
+      );
     }
 
     return Scaffold(

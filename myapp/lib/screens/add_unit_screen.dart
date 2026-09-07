@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../models/unit_model.dart';
+import '../models/user_model.dart';
 import '../services/database_service.dart';
 import '../services/auth_service.dart';
 import '../models/property_model.dart';
 import 'package:myapp/widgets/responsive_centered.dart';
 import 'package:myapp/providers/app_mode_provider.dart';
+import 'package:myapp/utils/currency_helper.dart';
 
 class AddUnitScreen extends StatefulWidget {
   final String propertyId;
@@ -65,10 +67,10 @@ class _AddUnitScreenState extends State<AddUnitScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = Provider.of<UserModel?>(context);
+    final currencySymbol = CurrencyHelper.getSymbol(user?.currency);
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Add Unit', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-      ),
       body: ResponsiveCentered(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -85,7 +87,7 @@ class _AddUnitScreenState extends State<AddUnitScreen> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _monthlyRentController,
-                  decoration: const InputDecoration(labelText: 'Monthly Rent', border: OutlineInputBorder(), prefixText: '\u20b9 '),
+                  decoration: InputDecoration(labelText: 'Monthly Rent', border: const OutlineInputBorder(), prefixText: '$currencySymbol '),
                   keyboardType: TextInputType.number,
                   validator: (value) => value!.isEmpty ? 'Required' : null,
                 ),

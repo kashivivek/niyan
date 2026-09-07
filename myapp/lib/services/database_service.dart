@@ -227,7 +227,8 @@ class DatabaseService {
         .map((snapshot) => snapshot.docs
             .map((doc) => PropertyModel.fromFirestore(doc))
             .where((p) => p.societyId == null)
-            .toList());
+            .toList())
+        .onErrorReturn(<PropertyModel>[]);
 
     final coOwnedStream = _db
         .collection('properties')
@@ -236,7 +237,8 @@ class DatabaseService {
         .map((snapshot) => snapshot.docs
             .map((doc) => PropertyModel.fromFirestore(doc))
             .where((p) => p.societyId == null)
-            .toList());
+            .toList())
+        .onErrorReturn(<PropertyModel>[]);
 
     return CombineLatestStream.combine2(ownedStream, coOwnedStream,
         (List<PropertyModel> owned, List<PropertyModel> coOwned) {
@@ -295,7 +297,25 @@ class DatabaseService {
         .collection('properties')
         .doc(propertyId)
         .snapshots()
+        .where((doc) => doc.exists && doc.data() != null)
         .map((doc) => PropertyModel.fromFirestore(doc));
+  }
+
+  Future<PropertyModel?> getPropertyFuture(String propertyId) async {
+    final doc = await _db.collection('properties').doc(propertyId).get();
+    if (!doc.exists) return null;
+    return PropertyModel.fromFirestore(doc);
+  }
+
+  Future<UnitModel?> getUnitFuture(String unitId, String propertyId) async {
+    final doc = await _db
+        .collection('properties')
+        .doc(propertyId)
+        .collection('units')
+        .doc(unitId)
+        .get();
+    if (!doc.exists) return null;
+    return UnitModel.fromFirestore(doc);
   }
 
   Future<void> addProperty(PropertyModel property) {
@@ -411,6 +431,7 @@ class DatabaseService {
         .collection('units')
         .doc(unitId)
         .snapshots()
+        .where((snapshot) => snapshot.exists && snapshot.data() != null)
         .map((snapshot) => UnitModel.fromFirestore(snapshot));
   }
 
@@ -557,6 +578,7 @@ class DatabaseService {
         .collection('tenants')
         .doc(tenantId)
         .snapshots()
+        .where((doc) => doc.exists && doc.data() != null)
         .map((doc) => TenantModel.fromFirestore(doc));
   }
 
@@ -585,7 +607,7 @@ class DatabaseService {
     return _db
         .collection('tenants')
         .doc(tenant.id)
-        .update(tenant.toFirestore());
+        .set(tenant.toFirestore(), SetOptions(merge: true));
   }
 
   Future<void> deleteTenant(String tenantId) async {
@@ -739,6 +761,7 @@ class DatabaseService {
               .where('unitId', isEqualTo: unit.id)
               .where('tenantId', isEqualTo: tenant.id)
               .where('month', isEqualTo: monthStr)
+              .where('ownerId', isEqualTo: ownerId)
               .get();
 
           // Do not generate standard rent if any rent record (Monthly Rent or Prorated Rent) already exists for this month
@@ -905,6 +928,7 @@ class DatabaseService {
     required String unitId,
     required String tenantId,
     required String propertyId,
+    required String ownerId,
   }) async {
     final batch = _db.batch();
 
@@ -928,6 +952,7 @@ class DatabaseService {
           .collection('rentRecords')
           .where('tenantId', isEqualTo: tenantId)
           .where('status', isEqualTo: RentStatus.pending.toString())
+          .where('ownerId', isEqualTo: ownerId)
           .get();
       final pendingRecords = pendingRecordsSnap.docs
           .map((doc) => RentRecordModel.fromFirestore(doc))

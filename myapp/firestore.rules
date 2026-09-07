@@ -40,11 +40,16 @@ service cloud.firestore {
          getMemberRole(societyId) == 'SocietyRole.committee');
     }
 
-    // Check if user has access to a property (as owner or co-owner)
     function hasPropertyAccess(propertyId) {
-      let prop = get(/databases/$(database)/documents/properties/$(propertyId)).data;
-      return prop.ownerId == request.auth.uid ||
-        ('coOwnerIds' in prop && request.auth.uid in prop.coOwnerIds);
+      return propertyId != null && propertyId != '' && _hasValidPropAccess(propertyId);
+    }
+
+    function _hasValidPropAccess(propertyId) {
+      let propDoc = get(/databases/$(database)/documents/properties/$(propertyId));
+      return propDoc != null && (
+        propDoc.data.ownerId == request.auth.uid ||
+        ('coOwnerIds' in propDoc.data && request.auth.uid in propDoc.data.coOwnerIds)
+      );
     }
 
     // ───────────────────────────────────────────────
