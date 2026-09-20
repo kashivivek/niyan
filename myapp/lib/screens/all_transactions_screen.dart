@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:myapp/models/transaction_model.dart';
 import 'package:myapp/models/user_model.dart';
@@ -9,6 +8,7 @@ import 'package:myapp/models/tenant_model.dart';
 import 'package:myapp/services/database_service.dart';
 import 'package:myapp/providers/theme_provider.dart';
 import 'package:myapp/utils/currency_helper.dart';
+import 'package:myapp/widgets/transaction_actions.dart';
 import 'package:provider/provider.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -402,7 +402,9 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
 
   Widget _buildTransactionCard(_TransactionDetail detail, String? currency) {
     final isIncome = detail.tx.type == TransactionType.income;
-    return Container(
+    return GestureDetector(
+      onTap: () => showTransactionActions(context, detail.tx),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -454,7 +456,10 @@ class _AllTransactionsScreenState extends State<AllTransactionsScreen> {
                   style: TextStyle(color: Colors.grey.shade400, fontSize: 11)),
             ],
           ),
+          const SizedBox(width: 4),
+          Icon(Icons.more_vert, size: 18, color: Colors.grey.shade400),
         ],
+      ),
       ),
     );
   }

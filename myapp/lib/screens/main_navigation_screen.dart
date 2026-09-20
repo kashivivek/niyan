@@ -27,6 +27,22 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   bool _isAutoRouting = false;
   bool _hasRestoredMode = false;
+  bool _hasEnsuredDues = false;
+
+  /// Materializes rent dues once per session from the shell, so generation
+  /// happens no matter which tab the landlord opens (not only the dashboard).
+  Future<void> _ensureDues() async {
+    if (_hasEnsuredDues) return;
+    final user = Provider.of<UserModel?>(context, listen: false);
+    if (user == null) return;
+    _hasEnsuredDues = true;
+    try {
+      await Provider.of<DatabaseService>(context, listen: false)
+          .ensureRentRecordsExist(user.uid);
+    } catch (e) {
+      // Non-critical background sync — safe to ignore.
+    }
+  }
 
   Future<void> _checkAutoRoute() async {
     if (_isAutoRouting || _hasRestoredMode) return;
@@ -85,6 +101,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     if (user != null && !_hasRestoredMode && !_isAutoRouting) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _checkAutoRoute();
+      });
+    }
+
+    // Generate any missing rent dues once the user profile is available.
+    if (user != null && !_hasEnsuredDues) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _ensureDues();
       });
     }
 

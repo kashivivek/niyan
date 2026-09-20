@@ -125,6 +125,7 @@ class CommunityService {
       if (!snapshot.exists) return;
 
       final poll = PollModel.fromFirestore(snapshot);
+      if (poll.status == PollStatus.closed || poll.isExpired) return;
       if (poll.votedUserIds.contains(userId)) return;
 
       final updatedOptions = poll.options.map((opt) {

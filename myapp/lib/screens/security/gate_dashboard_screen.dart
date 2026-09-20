@@ -263,8 +263,12 @@ class _GateDashboardScreenState extends State<GateDashboardScreen>
       }
 
       // 2. Try to see if it's a pre-approved visitor (QR Code Token)
-      final visitor = await visitorService.getVisitorByQrCode(code);
-      if (visitor != null && visitor.societyId == societyId) {
+      final visitor = await visitorService.getVisitorByQrCode(code, societyId: societyId);
+      if (visitor != null) {
+        if (visitor.isExpired) {
+          _showError('This visitor pass has expired.');
+          return;
+        }
         if (visitor.status == VisitorStatus.pre_approved) {
           await visitorService.checkIn(
             visitorId: visitor.id,

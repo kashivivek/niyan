@@ -6,15 +6,16 @@ import 'package:intl/intl.dart';
 
 class TransactionList extends StatelessWidget {
   final String unitId;
+  final String propertyId;
 
-  const TransactionList({super.key, required this.unitId});
+  const TransactionList({super.key, required this.unitId, required this.propertyId});
 
   @override
   Widget build(BuildContext context) {
     final dbService = Provider.of<DatabaseService>(context, listen: false);
 
     return StreamBuilder<List<TransactionModel>>(
-      stream: dbService.getTransactionsForUnit(unitId),
+      stream: dbService.getTransactionsForUnit(unitId, propertyId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());

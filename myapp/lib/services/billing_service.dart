@@ -286,7 +286,8 @@ class BillingService {
     bool billToTenants = false,
   }) async {
     if (unitIds.isEmpty) return;
-    final perUnitAmount = totalAmount / unitIds.length;
+    // Round to 2 decimals so split amounts don't accumulate floating-point drift.
+    final perUnitAmount = double.parse((totalAmount / unitIds.length).toStringAsFixed(2));
     final expenseDate = DateFormat('yyyy-MM').parse(month);
     final transactionDate =
         DateTime(expenseDate.year, expenseDate.month, 1);
@@ -506,11 +507,14 @@ class BillingService {
               amount: feeAmount,
             ));
           
-          final newTotal = updatedLineItems.fold<double>(0, (sum, item) => sum + item.amount);
-          
+          final newSubtotal = updatedLineItems.fold<double>(0, (sum, item) => sum + item.amount);
+          final newGst = updatedLineItems.fold<double>(0, (sum, item) => sum + item.gstAmount);
+
           batch.update(doc.reference, {
             'lineItems': updatedLineItems.map((e) => e.toMap()).toList(),
-            'grandTotal': newTotal + invoice.totalGst, // naive recalc for demo
+            'subtotal': newSubtotal,
+            'totalGst': newGst,
+            'grandTotal': newSubtotal + newGst,
           });
           updatedCount++;
         }
@@ -579,7 +583,7 @@ class BillingService {
             ],
             billingMonth: billingMonth,
             issueDate: now,
-            dueDate: DateTime(now.year, now.month, settings.defaultDueDay).add(const Duration(days: 30)),
+            dueDate: DateTime(now.year, now.month, settings.defaultDueDay),
             createdBy: 'System Auto-Gen',
           );
           batch.set(ref, invoice.toFirestore());

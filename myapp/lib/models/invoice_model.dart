@@ -135,8 +135,7 @@ class InvoiceModel {
   });
 
   bool get isOverdue =>
-      status != InvoiceStatus.paid &&
-      status != InvoiceStatus.cancelled &&
+      (status == InvoiceStatus.sent || status == InvoiceStatus.overdue) &&
       DateTime.now().isAfter(dueDate);
 
   /// Creates an invoice from individual line items with automatic GST calculation.

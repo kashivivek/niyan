@@ -10,6 +10,7 @@ class RentRecordModel {
   final String unitId;
   final String ownerId;
   final double amount;
+  final double paidAmount;
   final String month;
   final RentStatus status;
   final DateTime dueDate;
@@ -25,6 +26,7 @@ class RentRecordModel {
     required this.unitId,
     required this.ownerId,
     required this.amount,
+    this.paidAmount = 0.0,
     required this.month,
     required this.status,
     required this.dueDate,
@@ -33,6 +35,12 @@ class RentRecordModel {
     this.notes,
     this.title = 'Monthly Rent',
   });
+
+  /// Remaining balance still owed on this record.
+  double get outstanding {
+    final remaining = amount - paidAmount;
+    return remaining < 0 ? 0 : remaining;
+  }
 
   factory RentRecordModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -43,6 +51,7 @@ class RentRecordModel {
       unitId: data['unitId'] ?? '',
       ownerId: data['ownerId'] ?? '',
       amount: (data['amount'] ?? 0).toDouble(),
+      paidAmount: (data['paidAmount'] ?? 0).toDouble(),
       month: data['month'] ?? '',
       status: RentStatus.values.firstWhere(
         (e) => e.toString().split('.').last == data['status'],
@@ -63,6 +72,7 @@ class RentRecordModel {
       'unitId': unitId,
       'ownerId': ownerId,
       'amount': amount,
+      'paidAmount': paidAmount,
       'month': month,
       'status': status.toString().split('.').last,
       'dueDate': Timestamp.fromDate(dueDate),
@@ -80,6 +90,7 @@ class RentRecordModel {
     String? unitId,
     String? ownerId,
     double? amount,
+    double? paidAmount,
     String? month,
     RentStatus? status,
     DateTime? dueDate,
@@ -95,6 +106,7 @@ class RentRecordModel {
       unitId: unitId ?? this.unitId,
       ownerId: ownerId ?? this.ownerId,
       amount: amount ?? this.amount,
+      paidAmount: paidAmount ?? this.paidAmount,
       month: month ?? this.month,
       status: status ?? this.status,
       dueDate: dueDate ?? this.dueDate,

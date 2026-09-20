@@ -37,13 +37,17 @@ Map<String, dynamic> _calculateSummary(Map<String, dynamic> data) {
   final pendingTotal = records
       .where((r) => r.status != RentStatus.paid)
       .fold<double>(0, (sum, r) {
+        // For partially paid records, only the remaining balance is pending.
+        if (r.paidAmount > 0) return sum + r.outstanding;
         final liveRent = unitMap[r.unitId]?.monthlyRent ?? r.amount;
         return sum + (liveRent > 0 ? liveRent : r.amount);
       });
 
-  final collectedTotal = records
-      .where((r) => r.status == RentStatus.paid)
-      .fold<double>(0, (sum, r) => sum + r.amount);
+  final collectedTotal = records.fold<double>(0, (sum, r) {
+    // Legacy fully-paid records may not have paidAmount set, so fall back to amount.
+    if (r.status == RentStatus.paid) return sum + r.amount;
+    return sum + r.paidAmount;
+  });
 
   return {
     'propertiesCount': properties.length,
@@ -461,21 +465,6 @@ class _ActionCenterListState extends State<_ActionCenterList> {
       for (var item in selected) _itemKey(item): DateTime.now()
     };
 
-    final List<ActionItem> recordsToMark = [];
-    for (final item in selected) {
-      if (item.rentRecordIds.isNotEmpty) {
-        for (final rentRecordId in item.rentRecordIds) {
-          final recordItem = allItems.firstWhere(
-            (candidate) => candidate.rentRecordId == rentRecordId,
-            orElse: () => item,
-          );
-          recordsToMark.add(recordItem);
-        }
-      } else {
-        recordsToMark.add(item);
-      }
-    }
-
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -576,11 +565,18 @@ class _ActionCenterListState extends State<_ActionCenterList> {
 
     setState(() => _isProcessing = true);
     int success = 0;
-    for (final item in recordsToMark) {
+    for (final item in selected) {
       try {
         final paymentDate = selectedDates[_itemKey(item)] ?? DateTime.now();
-        if (item.rentRecordId != null) {
-          await widget.databaseService.recordRentPayment(item: item, ownerId: widget.user.uid, paymentDate: paymentDate);
+        final ids = item.rentRecordIds.isNotEmpty
+            ? item.rentRecordIds
+            : (item.rentRecordId != null ? [item.rentRecordId!] : <String>[]);
+        if (ids.isNotEmpty) {
+          await widget.databaseService.recordRentPaymentForIds(
+            rentRecordIds: ids,
+            ownerId: widget.user.uid,
+            paymentDate: paymentDate,
+          );
         } else {
           await widget.databaseService.recordTransaction(
             propertyId: item.propertyId,

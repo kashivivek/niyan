@@ -12,6 +12,8 @@ import 'package:myapp/providers/theme_provider.dart';
 import 'package:myapp/utils/currency_helper.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:myapp/utils/rent_message_helper.dart';
+import 'package:flutter/services.dart';
 import 'dart:developer' as developer;
 
 class TenantDetailScreen extends StatefulWidget {
@@ -213,7 +215,8 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
       stream: _rentRecordsStream,
       builder: (context, snapshot) {
         final records = snapshot.data ?? [];
-        final totalDue = records.where((r) => r.status == RentStatus.pending).fold(0.0, (sum, r) => sum + r.amount);
+        final unpaid = records.where((r) => r.status != RentStatus.paid).toList();
+        final totalDue = unpaid.fold(0.0, (sum, r) => sum + (r.paidAmount > 0 ? r.outstanding : r.amount));
 
         return Container(
           padding: const EdgeInsets.all(24),
@@ -234,6 +237,23 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
                   Expanded(child: _buildFinancialItem(Icons.warning_amber_rounded, 'Outstanding Balance', CurrencyHelper.format(totalDue, currency), Colors.redAccent)),
                 ],
               ),
+              if (totalDue > 0) ...[
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.notifications_active_outlined, size: 18),
+                    label: const Text('Send Rent Reminder'),
+                    onPressed: () => _sendRentReminder(tenant, unpaid, totalDue, currency),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ThemeProvider.accentBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         );
@@ -255,6 +275,58 @@ class _TenantDetailScreenState extends State<TenantDetailScreen> {
         const SizedBox(height: 4),
         Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color)),
       ],
+    );
+  }
+
+  Future<void> _sendRentReminder(
+      TenantModel tenant, List<RentRecordModel> unpaid, double totalDue, String? currency) async {
+    final user = Provider.of<UserModel?>(context, listen: false);
+    final landlordName = (user?.name != null && user!.name!.isNotEmpty) ? user.name! : 'Your Landlord';
+
+    // Earliest unpaid due date drives the reminder; fall back to the tenant's due date.
+    DateTime dueDate = tenant.dueDate;
+    if (unpaid.isNotEmpty) {
+      unpaid.sort((a, b) => a.dueDate.compareTo(b.dueDate));
+      dueDate = unpaid.first.dueDate;
+    }
+
+    final propertyLabel = (_propertyName.isNotEmpty && _unitName.isNotEmpty)
+        ? '$_propertyName - $_unitName'
+        : 'your rented unit';
+
+    final message = RentMessageHelper.buildReminderMessage(
+      tenantName: tenant.name,
+      landlordName: landlordName,
+      outstanding: totalDue,
+      dueDate: dueDate,
+      propertyLabel: propertyLabel,
+      currency: currency,
+    );
+
+    final sent = await RentMessageHelper.sendToTenant(phone: tenant.phoneNumber, message: message);
+    if (!sent && mounted) _showMessageFallback('Rent Reminder', message);
+  }
+
+  void _showMessageFallback(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: SingleChildScrollView(child: SelectableText(message)),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: message));
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Copied to clipboard.')),
+              );
+            },
+            child: const Text('Copy'),
+          ),
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+        ],
+      ),
     );
   }
 

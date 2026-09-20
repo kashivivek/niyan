@@ -143,6 +143,22 @@ class AdminService {
   }
 
   Future<String> createAmenityBooking(AmenityBookingModel booking) async {
+    // Prevent double-booking: reject if an active booking overlaps the slot.
+    final existing = await _db
+        .collection('amenityBookings')
+        .where('amenityId', isEqualTo: booking.amenityId)
+        .get();
+    final hasConflict = existing.docs
+        .map((d) => AmenityBookingModel.fromFirestore(d))
+        .any((b) =>
+            b.status != BookingStatus.cancelled &&
+            b.status != BookingStatus.completed &&
+            booking.startTime.isBefore(b.endTime) &&
+            booking.endTime.isAfter(b.startTime));
+    if (hasConflict) {
+      throw Exception('This amenity is already booked for the selected time slot.');
+    }
+
     final ref = _db.collection('amenityBookings').doc();
     final newBooking = AmenityBookingModel(
       id: ref.id,

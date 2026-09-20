@@ -87,19 +87,29 @@ class VisitorService {
     return null;
   }
 
-  /// Find visitor by QR code token.
-  Future<VisitorModel?> getVisitorByQrCode(String qrCode) async {
+  /// Find an active visitor pass by QR code token, scoped to a society.
+  ///
+  /// Scoping by [societyId] keeps the query within the guard's own society —
+  /// this both satisfies the Firestore security rules and prevents a pass from
+  /// one society resolving at another society's gate. Only passes that are still
+  /// usable (pre-approved or arrived) are returned; checked-in/out passes are
+  /// treated as already consumed, giving single-use passes their invalidation.
+  Future<VisitorModel?> getVisitorByQrCode(String qrCode, {required String societyId}) async {
     final snap = await _db
         .collection('visitors')
         .where('qrCode', isEqualTo: qrCode)
-        .where('status', whereIn: [
-          VisitorStatus.pre_approved.toString(),
-          VisitorStatus.arrived.toString(),
-        ])
-        .limit(1)
+        .where('societyId', isEqualTo: societyId)
+        .limit(5)
         .get();
     if (snap.docs.isEmpty) return null;
-    return VisitorModel.fromFirestore(snap.docs.first);
+    final matches = snap.docs
+        .map((d) => VisitorModel.fromFirestore(d))
+        .where((v) =>
+            v.status == VisitorStatus.pre_approved ||
+            v.status == VisitorStatus.arrived)
+        .toList();
+    if (matches.isEmpty) return null;
+    return matches.first;
   }
 
   // ──────────────────────────────────────────────

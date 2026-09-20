@@ -10,6 +10,7 @@ import 'package:myapp/services/database_service.dart';
 import 'package:intl/intl.dart';
 import 'package:myapp/providers/theme_provider.dart';
 import 'package:myapp/utils/currency_helper.dart';
+import 'package:myapp/widgets/transaction_actions.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -59,7 +60,12 @@ class UnitDetailScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 _buildTenancyHistory(context, currentUnit, databaseService),
                 const SizedBox(height: 24),
-                _buildRecentTransactions(currentUnit, databaseService, user?.currency),
+                _UnitTransactionsSection(
+                  unitId: currentUnit.id,
+                  propertyId: currentUnit.propertyId,
+                  databaseService: databaseService,
+                  currency: user?.currency,
+                ),
                 const SizedBox(height: 120),
               ],
             ),
@@ -351,57 +357,6 @@ class UnitDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentTransactions(UnitModel unit, DatabaseService databaseService, String? currency) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Recent Transactions', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-        const SizedBox(height: 12),
-        StreamBuilder<List<TransactionModel>>(
-          stream: databaseService.getTransactionsForUnit(unit.id),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData || snapshot.data!.isEmpty) return Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No transactions yet.', style: TextStyle(color: Colors.grey.shade400))));
-
-            final txs = snapshot.data!.take(5).toList();
-            return ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: txs.length,
-              itemBuilder: (context, index) {
-                final tx = txs[index];
-                final isIncome = tx.type == TransactionType.income;
-                return Container(
-                  margin: EdgeInsets.only(bottom: 12),
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)),
-                  child: Row(
-                    children: [
-                      Icon(isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, color: isIncome ? Colors.green : Colors.redAccent),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(tx.description, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            Text(DateFormat('MMM dd, yyyy').format(tx.date), style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color, fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        '${isIncome ? '+' : '-'}${CurrencyHelper.format(tx.amount, currency)}',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: isIncome ? Colors.green : Colors.redAccent),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        ),
-      ],
-    );
-  }
-
   void _confirmMoveOut(BuildContext context, DatabaseService databaseService, UnitModel unit, TenantModel tenant) {
     showDialog(
       context: context,
@@ -596,6 +551,99 @@ class UnitDetailScreen extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+/// Recent transactions for a unit.
+///
+/// Holds its own stream so parent rebuilds (e.g. the enclosing unit stream
+/// re-emitting) do not recreate the subscription and blank the list — that
+/// re-subscription was the cause of the "flicker then disappear" behaviour.
+class _UnitTransactionsSection extends StatefulWidget {
+  final String unitId;
+  final String propertyId;
+  final DatabaseService databaseService;
+  final String? currency;
+
+  const _UnitTransactionsSection({
+    required this.unitId,
+    required this.propertyId,
+    required this.databaseService,
+    required this.currency,
+  });
+
+  @override
+  State<_UnitTransactionsSection> createState() => _UnitTransactionsSectionState();
+}
+
+class _UnitTransactionsSectionState extends State<_UnitTransactionsSection> {
+  late final Stream<List<TransactionModel>> _stream;
+
+  @override
+  void initState() {
+    super.initState();
+    _stream = widget.databaseService.getTransactionsForUnit(widget.unitId, widget.propertyId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Recent Transactions', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+        const SizedBox(height: 12),
+        StreamBuilder<List<TransactionModel>>(
+          stream: _stream,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+              return const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()));
+            }
+            final all = snapshot.data ?? const <TransactionModel>[];
+            if (all.isEmpty) {
+              return Center(child: Padding(padding: const EdgeInsets.all(32), child: Text('No transactions yet.', style: TextStyle(color: Colors.grey.shade400))));
+            }
+
+            final txs = all.take(5).toList();
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: txs.length,
+              itemBuilder: (context, index) {
+                final tx = txs[index];
+                final isIncome = tx.type == TransactionType.income;
+                return GestureDetector(
+                  onTap: () => showTransactionActions(context, tx),
+                  child: Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)),
+                  child: Row(
+                    children: [
+                      Icon(isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, color: isIncome ? Colors.green : Colors.redAccent),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(tx.description, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            Text(DateFormat('MMM dd, yyyy').format(tx.date), style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '${isIncome ? '+' : '-'}${CurrencyHelper.format(tx.amount, widget.currency)}',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: isIncome ? Colors.green : Colors.redAccent),
+                      ),
+                    ],
+                  ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ],
     );
   }
 }

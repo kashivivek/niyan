@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:myapp/models/upcoming_due_model.dart';
 import 'package:myapp/models/property_model.dart';
 import 'package:myapp/models/unit_model.dart';
 import 'package:myapp/models/tenant_model.dart';
@@ -158,6 +157,11 @@ class DatabaseService {
           final resolvedUnit = unitMap[resolvedUnitId];
       final isOverdue = recordGroup.any((record) => today.isAfter(record.dueDate));
       final totalAmount = recordGroup.fold<double>(0, (sum, record) {
+        // Partial payments are tracked against the billed amount, so show the
+        // remaining balance rather than the (possibly higher) live rent.
+        if (record.paidAmount > 0) {
+          return sum + record.outstanding;
+        }
         final effectiveAmount = _effectiveRentAmountForRecord(
           record: record,
           unit: unitMap[record.unitId] ?? resolvedUnit,
@@ -629,18 +633,33 @@ class DatabaseService {
     return _db.collection('transactions').add(transaction.toFirestore());
   }
 
-  Stream<List<TransactionModel>> getTransactionsForUnit(String unitId) {
+  Future<void> updateTransaction(TransactionModel transaction) {
     return _db
         .collection('transactions')
-        .where('unitId', isEqualTo: unitId)
+        .doc(transaction.id)
+        .update(transaction.toFirestore());
+  }
+
+  Future<void> deleteTransaction(String transactionId) {
+    return _db.collection('transactions').doc(transactionId).delete();
+  }
+
+  Stream<List<TransactionModel>> getTransactionsForUnit(String unitId, String propertyId) {
+    // Query by propertyId (which the security rules allow via hasPropertyAccess)
+    // and filter to the unit in memory. A unitId-only query constrains neither
+    // ownerId nor propertyId, so Firestore rejects it as an unauthorized list.
+    return _db
+        .collection('transactions')
+        .where('propertyId', isEqualTo: propertyId)
         .snapshots()
         .map((snapshot) {
       final list = snapshot.docs
           .map((doc) => TransactionModel.fromFirestore(doc))
+          .where((tx) => tx.unitId == unitId)
           .toList();
       list.sort((a, b) => b.date.compareTo(a.date));
       return list;
-    });
+    }).onErrorReturn(<TransactionModel>[]);
   }
 
   Stream<List<TransactionModel>> allTransactions(String ownerId) {
@@ -707,7 +726,15 @@ class DatabaseService {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    await _checkAnnualRentIncreases(ownerId, tenants, units);
+    // Annual rent-increase notifications are non-critical. A failure here (e.g. a
+    // missing composite index or a transient permission error) must never abort
+    // core rent-record generation, otherwise recently past-due tenants silently
+    // disappear from the dashboard's pending/upcoming list.
+    try {
+      await _checkAnnualRentIncreases(ownerId, tenants, units);
+    } catch (e) {
+      developer.log('Annual rent increase check failed (non-critical): $e');
+    }
 
     // We check Current Month, Previous Month (for overdue), and Next Month (if close)
     final monthsToCheck = [
@@ -773,7 +800,11 @@ class DatabaseService {
           if (!hasRentRecord) {
             developer
                 .log('Creating rent record for ${tenant.name} - $monthStr');
-            final ref = _db.collection('rentRecords').doc();
+            // Deterministic ID so concurrent generation runs (e.g. phone + web
+            // open at once) converge on a single doc instead of duplicating.
+            final ref = _db
+                .collection('rentRecords')
+                .doc('rent_${ownerId}_${unit.id}_${tenant.id}_$monthStr');
             final record = RentRecordModel(
               id: ref.id,
               tenantId: tenant.id,
@@ -833,6 +864,7 @@ class DatabaseService {
     final recordRef = _db.collection('rentRecords').doc(item.rentRecordId);
     batch.update(recordRef, {
       'status': 'paid',
+      'paidAmount': FieldValue.increment(item.amount),
       'paymentDate': Timestamp.fromDate(pDate),
     });
 
@@ -853,6 +885,150 @@ class DatabaseService {
     batch.set(txRef, transaction.toFirestore());
 
     await batch.commit();
+  }
+
+  /// Records a full or partial payment against a specific rent record.
+  ///
+  /// Adds [paymentAmount] to the record's paid total, flips the status to
+  /// paid/partial accordingly, and writes a matching income transaction so the
+  /// portfolio's collected total stays in sync. Returns the updated record.
+  Future<RentRecordModel> recordRentRecordPayment({
+    required RentRecordModel record,
+    required double paymentAmount,
+    required String ownerId,
+    DateTime? paymentDate,
+    String? paymentMethod,
+    String? notes,
+  }) async {
+    final pDate = paymentDate ?? DateTime.now();
+    final newPaid = record.paidAmount + paymentAmount;
+    // Small tolerance so floating-point rounding doesn't leave a paid record "partial".
+    final fullyPaid = newPaid + 0.01 >= record.amount;
+    final newStatus = fullyPaid ? RentStatus.paid : RentStatus.partial;
+
+    final batch = _db.batch();
+
+    final recordRef = _db.collection('rentRecords').doc(record.id);
+    batch.update(recordRef, {
+      'paidAmount': newPaid,
+      'status': newStatus.toString().split('.').last,
+      'paymentDate': Timestamp.fromDate(pDate),
+      if (paymentMethod != null && paymentMethod.isNotEmpty) 'paymentMethod': paymentMethod,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+    });
+
+    final txRef = _db.collection('transactions').doc();
+    final transaction = TransactionModel(
+      id: txRef.id,
+      unitId: record.unitId,
+      propertyId: record.propertyId,
+      ownerId: ownerId,
+      tenantId: record.tenantId,
+      description: 'Payment for ${record.title} (${record.month})',
+      amount: paymentAmount,
+      date: pDate,
+      type: TransactionType.income,
+      month: record.month,
+    );
+    batch.set(txRef, transaction.toFirestore());
+
+    await batch.commit();
+
+    return record.copyWith(
+      paidAmount: newPaid,
+      status: newStatus,
+      paymentDate: pDate,
+      paymentMethod: paymentMethod ?? record.paymentMethod,
+      notes: notes ?? record.notes,
+    );
+  }
+
+  /// Marks each of the given rent records as fully paid, writing one income
+  /// transaction per record for its own remaining balance. Reading each record
+  /// ensures correct per-record amounts (fixes the old grouped over-collection)
+  /// and makes the operation idempotent for records already paid.
+  Future<void> recordRentPaymentForIds({
+    required List<String> rentRecordIds,
+    required String ownerId,
+    DateTime? paymentDate,
+  }) async {
+    if (rentRecordIds.isEmpty) return;
+    final pDate = paymentDate ?? DateTime.now();
+    final batch = _db.batch();
+    var hasChanges = false;
+
+    for (final id in rentRecordIds) {
+      final ref = _db.collection('rentRecords').doc(id);
+      final snap = await ref.get();
+      if (!snap.exists) continue;
+      final record = RentRecordModel.fromFirestore(snap);
+      if (record.status == RentStatus.paid) continue;
+
+      final remaining = record.outstanding > 0 ? record.outstanding : record.amount;
+      batch.update(ref, {
+        'status': 'paid',
+        'paidAmount': record.amount,
+        'paymentDate': Timestamp.fromDate(pDate),
+      });
+
+      final txRef = _db.collection('transactions').doc();
+      final transaction = TransactionModel(
+        id: txRef.id,
+        unitId: record.unitId,
+        propertyId: record.propertyId,
+        ownerId: ownerId,
+        tenantId: record.tenantId,
+        description: 'Payment for ${record.title} (${record.month})',
+        amount: remaining,
+        date: pDate,
+        type: TransactionType.income,
+        month: record.month,
+      );
+      batch.set(txRef, transaction.toFirestore());
+      hasChanges = true;
+    }
+
+    if (hasChanges) await batch.commit();
+  }
+
+  /// Adds a one-off late fee for an overdue rent record as its own line so it
+  /// shows up in dues and can be collected independently. Refuses to add a
+  /// second late fee for the same unit/month to avoid double-charging.
+  Future<void> applyLateFeeToRecord({
+    required RentRecordModel record,
+    required double feeAmount,
+  }) async {
+    if (feeAmount <= 0) {
+      throw Exception('Late fee must be greater than zero.');
+    }
+
+    final existing = await _db
+        .collection('rentRecords')
+        .where('unitId', isEqualTo: record.unitId)
+        .where('month', isEqualTo: record.month)
+        .where('ownerId', isEqualTo: record.ownerId)
+        .get();
+    final alreadyApplied =
+        existing.docs.any((d) => (d.data()['title'] as String?) == 'Late Fee');
+    if (alreadyApplied) {
+      throw Exception('A late fee has already been applied for this month.');
+    }
+
+    final ref = _db.collection('rentRecords').doc();
+    final feeRecord = RentRecordModel(
+      id: ref.id,
+      tenantId: record.tenantId,
+      propertyId: record.propertyId,
+      unitId: record.unitId,
+      ownerId: record.ownerId,
+      amount: feeAmount,
+      month: record.month,
+      status: RentStatus.pending,
+      dueDate: DateTime.now(),
+      title: 'Late Fee',
+      notes: 'Late fee for ${record.title} (${record.month})',
+    );
+    await ref.set(feeRecord.toFirestore());
   }
 
   Future<void> assignTenantToUnit({
